@@ -10,6 +10,8 @@ framebuffer architecture with [BARS](https://github.com/LawtonBarnes/bars)
 -- headless pygame, direct `/dev/fb0` writes, raw `evdev` keyboard
 input, exactly the same pattern used across every sibling app.
 
+![Framebuffer capture -- radar screen](./img/SCREEN_JOANJETT.png)
+
 ## Why this exists as a rewrite
 
 An earlier version of this idea (internally called "retro-radar") used
