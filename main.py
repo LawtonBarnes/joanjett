@@ -132,14 +132,24 @@ class FrameBuffer:
         os.close(self.fd)
 
 
-def show_splash(fb):
+SPLASH_IMAGE_OFFSET_Y = -40  # shifts the splash art up from dead-center to
+# leave room for the VERSION/LOADING text underneath it
+SPLASH_TEXT_GAP = 12  # below the image, before the first text line
+SPLASH_LINE_GAP = 4  # between the two text lines
+
+
+def show_splash(fb, font, version_text, range_nm):
     """Blocking splash at launch, centered at native resolution -- NOT
     scaled to fit (unlike bars.py's splash, which is scaled since its
     source art matches the frame's aspect ratio). JOAN JETT's splash.png is
     500x281, well under the 720x480 frame, and scaling it up would blur a
     small image (caught live 2026-08-25 before ever shipping this version).
     Any failure (no splash.png deployed, bad image) just skips straight to
-    normal startup rather than taking the app down over a cosmetic feature."""
+    normal startup rather than taking the app down over a cosmetic feature.
+
+    Image is shifted up (SPLASH_IMAGE_OFFSET_Y) to leave room for two
+    centered orange (colors.ORANGE) status lines underneath -- VERSION and
+    the current map-load range, per user request."""
     if not SPLASH_PATH.exists():
         return
     try:
@@ -150,7 +160,18 @@ def show_splash(fb):
     canvas = pygame.Surface((FRAME_W, FRAME_H))
     canvas.fill(BLACK)
     img_w, img_h = img.get_size()
-    canvas.blit(img, ((FRAME_W - img_w) // 2, (FRAME_H - img_h) // 2))
+    img_x = (FRAME_W - img_w) // 2
+    img_y = (FRAME_H - img_h) // 2 + SPLASH_IMAGE_OFFSET_Y
+    canvas.blit(img, (img_x, img_y))
+
+    text_color = colors.rgb(colors.ORANGE)
+    line1 = font.render(f"VERSION {version_text}", True, text_color)
+    line2 = font.render(f"LOADING MAPS {range_nm}NM...", True, text_color)
+    y = img_y + img_h + SPLASH_TEXT_GAP
+    canvas.blit(line1, ((FRAME_W - line1.get_width()) // 2, y))
+    y += line1.get_height() + SPLASH_LINE_GAP
+    canvas.blit(line2, ((FRAME_W - line2.get_width()) // 2, y))
+
     fb.write_surface(canvas)
     time.sleep(SPLASH_SECONDS)
 
@@ -224,7 +245,7 @@ class JoanJettApp:
         except OSError as exc:
             print(f"Console graphics mode not available: {exc}", file=sys.stderr)
 
-        show_splash(self.fb)
+        show_splash(self.fb, self.status_font, VERSION, self.range_multiplier * 4)
 
     def _handle_signal(self, signum, frame):
         self._quit_requested = True
