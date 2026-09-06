@@ -75,7 +75,7 @@ def render_aircraft_screen(size, live_aircraft, fetch_ok, settings, range_multip
     y = margin_y
     y += LINE_HEIGHT  # skip a line
     y += _draw_boxed_line(layer, font, "AIRCRAFT DATA", label_color, (w / 2, y), align="center")
-    y += LINE_HEIGHT * 2  # skip 2 lines
+    y += LINE_HEIGHT  # skip 1 line
 
     header_text = _format_row([label for label, _, _ in COLUMNS])
     table_width = font.size(header_text)[0]
