@@ -81,7 +81,6 @@ def render_aircraft_screen(size, live_aircraft, fetch_ok, settings, range_multip
     table_width = font.size(header_text)[0]
     table_x = max(margin_x, (w - table_width) / 2)
     y += _draw_boxed_line(layer, font, header_text, label_color, (table_x, y), align="left")
-    y += LINE_HEIGHT  # skip 1 line
 
     for ac in (live_aircraft or [])[:MAX_ROWS]:
         alt = ac.get("alt_baro")
