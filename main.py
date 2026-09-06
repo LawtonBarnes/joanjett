@@ -166,7 +166,7 @@ def show_splash(fb, font, version_text, range_nm):
 
     text_color = colors.rgb(colors.ORANGE)
     line1 = font.render(f"VERSION {version_text}", True, text_color)
-    line2 = font.render(f"LOADING MAPS {range_nm}NM...", True, text_color)
+    line2 = font.render(f"LOADING MAPS {range_nm}NM", True, text_color)
     y = img_y + img_h + SPLASH_TEXT_GAP
     canvas.blit(line1, ((FRAME_W - line1.get_width()) // 2, y))
     y += line1.get_height() + SPLASH_LINE_GAP
@@ -259,11 +259,18 @@ class JoanJettApp:
         canvas.blit(text, ((FRAME_W - text.get_width()) // 2, (FRAME_H - text.get_height()) // 2))
         self.fb.write_surface(canvas)
 
-    def rebuild_map(self):
+    def rebuild_map(self, show_loading_screen=True):
         """Returns True/False (success). On failure self.map_surface/
         background_surface are left untouched -- caller decides whether to
-        keep them (see change_range)."""
-        self.show_loading()
+        keep them (see change_range).
+
+        show_loading_screen=False skips the blocking LOADING MAP text
+        screen -- used for the very first startup fetch, since the splash
+        screen already shows the same VERSION/range info (per user
+        request); a RANGE change via the remote (change_range) still wants
+        the loading feedback since there's no splash up at that point."""
+        if show_loading_screen:
+            self.show_loading()
         s = self.settings
         range_nm = self.range_multiplier * 4
         try:
@@ -408,7 +415,7 @@ class JoanJettApp:
 
     def run(self):
         try:
-            self.rebuild_map()
+            self.rebuild_map(show_loading_screen=False)
             self.sweep_start_time = time.monotonic()
             self._prev_sweep_angle = 0.0
             running = True
