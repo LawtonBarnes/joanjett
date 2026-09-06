@@ -115,7 +115,7 @@ def render_aircraft_screen(size, live_aircraft, fetch_ok, settings, range_multip
         squawk_label_color = squawk_value_color = alert_color
     else:
         squawk_label = "SQUAWK"
-        squawk_value = "ACTIVE" if fetch_ok else "NO DATA"
+        squawk_value = "NONE" if fetch_ok else "NO DATA"
         squawk_label_color, squawk_value_color = label_color, info_color
 
     y += _draw_boxed_line(layer, font, squawk_label, squawk_label_color, (table_x, y), align="left")

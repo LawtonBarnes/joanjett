@@ -130,7 +130,7 @@ def render_info(size, settings, range_multiplier, sweep_angle_deg, live_aircraft
         squawk_label_color = squawk_value_color = alert_color
     else:
         squawk_label = "SQUAWK"
-        squawk_value = "ACTIVE" if fetch_ok else "NO DATA"
+        squawk_value = "NONE" if fetch_ok else "NO DATA"
         squawk_label_color, squawk_value_color = label_color, info_color
 
     stats_items = [
