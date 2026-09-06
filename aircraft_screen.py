@@ -14,7 +14,6 @@ import colors
 FONT_SIZE = 22
 LINE_HEIGHT = 22  # tighter than info.py's 24 -- a 10-row table + footer
 # needs to fit in the vertical budget the 8% underscan leaves
-GAP = 8
 BOX_PAD_X = 4
 BOX_PAD_Y = 2
 BOX_ALPHA = 64  # 25% opacity, matching the Info HUD's boxes
@@ -74,14 +73,15 @@ def render_aircraft_screen(size, live_aircraft, fetch_ok, settings, range_multip
     margin_y = h * UNDERSCAN_FRACTION
 
     y = margin_y
+    y += LINE_HEIGHT  # skip a line
     y += _draw_boxed_line(layer, font, "AIRCRAFT DATA", label_color, (w / 2, y), align="center")
-    y += GAP
+    y += LINE_HEIGHT * 2  # skip 2 lines
 
     header_text = _format_row([label for label, _, _ in COLUMNS])
     table_width = font.size(header_text)[0]
     table_x = max(margin_x, (w - table_width) / 2)
     y += _draw_boxed_line(layer, font, header_text, label_color, (table_x, y), align="left")
-    y += LINE_HEIGHT
+    y += LINE_HEIGHT  # skip 1 line
 
     for ac in (live_aircraft or [])[:MAX_ROWS]:
         alt = ac.get("alt_baro")
@@ -97,7 +97,7 @@ def render_aircraft_screen(size, live_aircraft, fetch_ok, settings, range_multip
         )
         y += _draw_boxed_line(layer, font, row_text, info_color, (table_x, y), align="left")
 
-    y += GAP
+    y += LINE_HEIGHT  # skip 1 line
     range_nm = range_multiplier * 4
     countdown = max(0.0, settings.interval_sec * (1 - sweep_angle_deg / 360.0))
     mil_count = sum(1 for a in live_aircraft if a.get("military")) if live_aircraft else 0
@@ -110,7 +110,7 @@ def render_aircraft_screen(size, live_aircraft, fetch_ok, settings, range_multip
     ]
     for label, value in footer_stats:
         y += _draw_boxed_segments(
-            layer, font, [(label, label_color), (value, info_color)], (margin_x, y), align="left"
+            layer, font, [(label, label_color), (value, info_color)], (table_x, y), align="left"
         )
 
     return layer
