@@ -78,7 +78,10 @@ def render_aircraft_screen(size, live_aircraft, fetch_ok, settings, range_multip
     y += GAP
 
     header_text = _format_row([label for label, _, _ in COLUMNS])
-    y += _draw_boxed_line(layer, font, header_text, label_color, (margin_x, y), align="left")
+    table_width = font.size(header_text)[0]
+    table_x = max(margin_x, (w - table_width) / 2)
+    y += _draw_boxed_line(layer, font, header_text, label_color, (table_x, y), align="left")
+    y += LINE_HEIGHT
 
     for ac in (live_aircraft or [])[:MAX_ROWS]:
         alt = ac.get("alt_baro")
@@ -92,7 +95,7 @@ def render_aircraft_screen(size, live_aircraft, fetch_ok, settings, range_multip
                 f"{round(ac['heading_deg'])}°",
             ]
         )
-        y += _draw_boxed_line(layer, font, row_text, info_color, (margin_x, y), align="left")
+        y += _draw_boxed_line(layer, font, row_text, info_color, (table_x, y), align="left")
 
     y += GAP
     range_nm = range_multiplier * 4
