@@ -35,7 +35,11 @@ def _heading_unit_vector(heading_deg):
     import math
 
     theta = math.radians(heading_deg)
-    return (math.sin(theta), -math.cos(theta))  # 0=up/north, clockwise -- same convention as radar.py
+    # 0=up/north, clockwise -- same convention as radar.py. y-component
+    # scaled by PIXEL_ASPECT_RATIO (see config.py) so the small arrowhead
+    # icon points at the correct visual angle on NTSC's non-square pixels,
+    # matching the sweep/rings/map underneath instead of drawing skewed.
+    return (math.sin(theta), -math.cos(theta) * config.PIXEL_ASPECT_RATIO)
 
 
 def _angle_in_swept_range(angle, start, end):

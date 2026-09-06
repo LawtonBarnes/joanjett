@@ -54,7 +54,10 @@ SWEEP_HEAD_WIDTH = 2
 def _polar_to_px(radius_px, angle_deg, center_px=config.CENTER_PX):
     theta = math.radians(angle_deg)
     dx = radius_px * math.sin(theta)
-    dy = -radius_px * math.cos(theta)
+    # PIXEL_ASPECT_RATIO corrects for NTSC's non-square pixels (see
+    # config.py) so a fixed radius_px draws a true circle on the CRT
+    # instead of a vertical oval -- same correction as geo.nm_to_px.
+    dy = -radius_px * math.cos(theta) * config.PIXEL_ASPECT_RATIO
     return (center_px[0] + dx, center_px[1] + dy)
 
 

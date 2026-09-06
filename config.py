@@ -18,6 +18,15 @@ SCREEN_HEIGHT = 480
 OUTER_RADIUS_PX = 340
 CENTER_PX = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
 
+# NTSC composite 720x480 has non-square pixels: native resolution is 3:2 but
+# displayed at 4:3, so pixel aspect ratio (width:height) = (4/3)/(720/480) =
+# 8/9. Every layer's angle/lat-lon-to-pixel math assumed square pixels,
+# which drew true circles in the framebuffer that came out as vertical
+# ovals on the real CRT (horizontally compressed by this same factor).
+# Applied as a multiplier on the vertical (y) component only -- geo.py and
+# radar.py's shared projection primitives are the two places that need it.
+PIXEL_ASPECT_RATIO = 8 / 9
+
 MIN_RANGE_MULTIPLIER = 1
 MAX_RANGE_MULTIPLIER = 15  # -> 60NM outer range; safety bound, see Settings.range_multiplier
 

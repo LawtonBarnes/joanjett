@@ -6,6 +6,8 @@ tens-of-NM scale this app operates at, no need for a real map projection."""
 
 import math
 
+import config
+
 NM_PER_DEG_LAT = 60.0
 
 
@@ -18,7 +20,10 @@ def latlon_to_nm(lat, lon, center_lat, center_lon):
 
 def nm_to_px(east_nm, north_nm, px_per_nm, center_px):
     x = center_px[0] + east_nm * px_per_nm
-    y = center_px[1] - north_nm * px_per_nm  # screen y grows downward; north is up
+    # screen y grows downward (north is up); PIXEL_ASPECT_RATIO corrects for
+    # NTSC's non-square pixels so equal real-world NM offsets in east/north
+    # land as a true circle on the CRT, not an oval -- see config.py.
+    y = center_px[1] - north_nm * px_per_nm * config.PIXEL_ASPECT_RATIO
     return x, y
 
 
