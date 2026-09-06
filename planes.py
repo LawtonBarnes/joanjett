@@ -51,17 +51,26 @@ def _angle_in_swept_range(angle, start, end):
     return pos <= span
 
 
+HELICOPTER_CATEGORY = "A7"  # ADS-B emitter category for rotorcraft
+
+
 class TrackedPlane:
     def __init__(self, trail_length):
         self.trail = deque(maxlen=trail_length)  # [(lat, lon), ...], oldest first
         self.callsign = ""
         self.heading_deg = 0.0
+        self.category = None
 
     def maybe_update(self, live_ac, swept_from, swept_to):
         if _angle_in_swept_range(live_ac["bearing_deg"], swept_from, swept_to):
             self.trail.append((live_ac["lat"], live_ac["lon"]))
             self.heading_deg = live_ac["heading_deg"]
             self.callsign = live_ac["callsign"]
+            self.category = live_ac.get("category")
+
+    @property
+    def is_helicopter(self):
+        return self.category == HELICOPTER_CATEGORY
 
     @property
     def has_position(self):
@@ -117,10 +126,13 @@ def render_planes(tracked, center_lat, center_lon, range_nm, plane_color, font, 
     # Callsign boxes drawn first, trail+arrowhead drawn after (on top) --
     # per user request 2026-08-25, so an overlapping black box never punches
     # a gap into the trail/arrowhead line.
+    helicopter_color = colors.rgb(colors.MAGENTA)
+
     for plane, px_points in plane_data:
         if plane.callsign:
             pos = px_points[-1]
-            text = font.render(plane.callsign, True, plane_color)
+            label_color = helicopter_color if plane.is_helicopter else plane_color
+            text = font.render(plane.callsign, True, label_color)
             box = pygame.Surface(
                 (text.get_width() + CALLSIGN_BOX_PAD_X * 2, text.get_height() + CALLSIGN_BOX_PAD_Y * 2)
             )
@@ -138,6 +150,7 @@ def render_planes(tracked, center_lat, center_lon, range_nm, plane_color, font, 
         perp = (dy, -dx)
         base_l = (base_center[0] + perp[0] * ARROWHEAD_WIDTH / 2, base_center[1] + perp[1] * ARROWHEAD_WIDTH / 2)
         base_r = (base_center[0] - perp[0] * ARROWHEAD_WIDTH / 2, base_center[1] - perp[1] * ARROWHEAD_WIDTH / 2)
-        pygame.draw.polygon(layer, plane_color, [tip, base_l, base_r])
+        arrow_color = helicopter_color if plane.is_helicopter else plane_color
+        pygame.draw.polygon(layer, arrow_color, [tip, base_l, base_r])
 
     return layer

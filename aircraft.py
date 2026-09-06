@@ -52,6 +52,7 @@ def fetch_aircraft(center_lat, center_lon, max_tracked):
                 "alt_baro": ac.get("alt_baro"),
                 "gs": ac.get("gs"),
                 "squawk": ac.get("squawk"),
+                "category": ac.get("category"),  # e.g. "A7" = rotorcraft
                 # readsb decodes 7500/7600/7700 into this field directly --
                 # "none" in normal operation, otherwise one of "general"/
                 # "lifeguard"/"minfuel"/"nordo"/"unlawful"/"downed".
