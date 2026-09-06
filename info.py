@@ -72,12 +72,19 @@ def _panel_line_count(items):
 
 
 def _draw_panel(surface, font, items, x, top_y, label_color, info_color, align):
+    """A ("stat", label, value) item takes the panel's default label_color/
+    info_color; ("stat", label, value, lc, vc) overrides both colors for
+    that one stat -- used for the SQUAWK/EMERGENCY alert row."""
     y = top_y
     for item in items:
         if item[0] == "stat":
-            _, label, value = item
-            y += _draw_boxed_segments(surface, font, [(label, label_color)], (x, y), align=align)
-            y += _draw_boxed_segments(surface, font, [(value, info_color)], (x, y), align=align)
+            if len(item) == 3:
+                _, label, value = item
+                lc, vc = label_color, info_color
+            else:
+                _, label, value, lc, vc = item
+            y += _draw_boxed_segments(surface, font, [(label, lc)], (x, y), align=align)
+            y += _draw_boxed_segments(surface, font, [(value, vc)], (x, y), align=align)
         elif item[0] == "blank":
             y += LINE_HEIGHT
         elif item[0] == "header":
@@ -109,10 +116,27 @@ def render_info(size, settings, range_multiplier, sweep_angle_deg, live_aircraft
     countdown = max(0.0, settings.interval_sec * (1 - sweep_angle_deg / 360.0))
     mil_count = sum(1 for a in live_aircraft if a.get("military")) if live_aircraft else 0
 
+    # SQUAWK normally just mirrors the aircraft-fetch health (ACTIVE/NO
+    # DATA); if any tracked aircraft is actually squawking an emergency
+    # code (readsb's "emergency" field, decoded from 7500/7600/7700), the
+    # whole row flips to a red EMERGENCY alert instead -- real signal, not
+    # a synthetic status.
+    emergencies = sorted(
+        {a["emergency"] for a in (live_aircraft or []) if a.get("emergency") not in (None, "none")}
+    )
+    alert_color = colors.rgb(colors.COLOR_SCHEMES[scheme]["ALERTS"])
+    if emergencies:
+        squawk_label, squawk_value = "EMERGENCY", ", ".join(e.upper() for e in emergencies)
+        squawk_label_color = squawk_value_color = alert_color
+    else:
+        squawk_label = "SQUAWK"
+        squawk_value = "ACTIVE" if fetch_ok else "NO DATA"
+        squawk_label_color, squawk_value_color = label_color, info_color
+
     stats_items = [
         ("stat", f"ATC ({settings.atc_icao})", settings.atc_freq),
         ("blank",),
-        ("stat", "STATUS", "ACTIVE" if fetch_ok else "NO DATA"),
+        ("stat", squawk_label, squawk_value, squawk_label_color, squawk_value_color),
         ("stat", "COUNT", f"{len(live_aircraft) if live_aircraft else 0} ({mil_count} MIL)"),
         ("stat", "RANGE", f"{range_nm}NM"),
         ("stat", "INTVL", f"{int(settings.interval_sec)}S"),

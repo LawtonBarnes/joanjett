@@ -100,8 +100,28 @@ def render_aircraft_screen(size, live_aircraft, fetch_ok, settings, range_multip
     range_nm = range_multiplier * 4
     countdown = max(0.0, settings.interval_sec * (1 - sweep_angle_deg / 360.0))
     mil_count = sum(1 for a in live_aircraft if a.get("military")) if live_aircraft else 0
+
+    # SQUAWK stacked as its own label/value lines (like info.py's STATS
+    # panel) rather than one combined "LABEL: value" line, since it needs
+    # to flip to a red EMERGENCY alert when a tracked aircraft is actually
+    # squawking 7500/7600/7700 (readsb's "emergency" field) -- real signal,
+    # not a synthetic fetch-health status.
+    emergencies = sorted(
+        {a["emergency"] for a in (live_aircraft or []) if a.get("emergency") not in (None, "none")}
+    )
+    alert_color = colors.rgb(colors.COLOR_SCHEMES[scheme]["ALERTS"])
+    if emergencies:
+        squawk_label, squawk_value = "EMERGENCY", ", ".join(e.upper() for e in emergencies)
+        squawk_label_color = squawk_value_color = alert_color
+    else:
+        squawk_label = "SQUAWK"
+        squawk_value = "ACTIVE" if fetch_ok else "NO DATA"
+        squawk_label_color, squawk_value_color = label_color, info_color
+
+    y += _draw_boxed_line(layer, font, squawk_label, squawk_label_color, (table_x, y), align="left")
+    y += _draw_boxed_line(layer, font, squawk_value, squawk_value_color, (table_x, y), align="left")
+
     footer_stats = [
-        ("STATUS: ", "ACTIVE" if fetch_ok else "NO DATA"),
         ("CONTACTS: ", f"{len(live_aircraft) if live_aircraft else 0} ({mil_count} MIL)"),
         ("RANGE: ", f"{range_nm}NM"),
         ("INTERVAL: ", f"{int(settings.interval_sec)}S"),

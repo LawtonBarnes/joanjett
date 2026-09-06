@@ -51,6 +51,11 @@ def fetch_aircraft(center_lat, center_lon, max_tracked):
                 "heading_deg": heading,
                 "alt_baro": ac.get("alt_baro"),
                 "gs": ac.get("gs"),
+                "squawk": ac.get("squawk"),
+                # readsb decodes 7500/7600/7700 into this field directly --
+                # "none" in normal operation, otherwise one of "general"/
+                # "lifeguard"/"minfuel"/"nordo"/"unlawful"/"downed".
+                "emergency": ac.get("emergency", "none"),
                 # bit 0 of readsb's dbFlags is the common military-aircraft
                 # convention; absent entirely on most contacts (civil, or
                 # readsb builds without a military DB loaded), so this is a
