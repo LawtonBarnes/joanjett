@@ -46,6 +46,7 @@ import mapdata  # noqa: E402
 import maprender  # noqa: E402
 import planes  # noqa: E402
 import radar  # noqa: E402
+import stats_screen  # noqa: E402
 
 VERSION = config.VERSION
 
@@ -63,9 +64,11 @@ FRAME_INTERVAL = 1.0 / 20  # 20fps -- plenty smooth for a slow-rotating sweep,
 # cheap on a Pi 3B+ (LOUDNESS already proves continuous full-frame fb0
 # writes are fine on this exact hardware)
 
-# Screens cycled via Left/Right (spec's confirmed 3-screen plan: Radar,
-# Aircraft, Settings) -- only the first two exist so far.
-SCREENS = ["radar", "aircraft"]
+# Screens cycled via Left/Right. Settings (the spec's original 3-screen
+# plan) still isn't built; two new stats pages were added instead
+# 2026-09-11 once flightlog.py had accumulated enough data to be worth
+# looking at.
+SCREENS = ["radar", "aircraft", "stats_callsign", "stats_type"]
 
 # See bars.py -- Home exits with this so a future menu/STRINGS integration
 # can jump straight to Health Monitor. No menu.py consumes it yet on this
@@ -368,12 +371,27 @@ class JoanJettApp:
         canvas.blit(table_layer, (0, 0))
         return canvas
 
+    def _render_stats_screen(self, screen_name):
+        # Same plain-map/no-radar-layers treatment as the Aircraft screen
+        # above -- the pie chart doesn't need the compass/rings/sweep/
+        # planes any more than that table did.
+        canvas = self.map_surface.copy()
+        canvas.blit(self.vignette_surface, (0, 0))
+        mode = "callsign" if screen_name == "stats_callsign" else "type"
+        stats_layer = stats_screen.render_stats_screen(
+            (FRAME_W, FRAME_H), mode, self.settings.color_scheme, self.aircraft_screen_font,
+        )
+        canvas.blit(stats_layer, (0, 0))
+        return canvas
+
     def render(self):
         angle = self.sweep_angle()
         self.update_planes(angle)
 
         if self.current_screen == "aircraft":
             canvas = self._render_aircraft_screen(angle)
+        elif self.current_screen in ("stats_callsign", "stats_type"):
+            canvas = self._render_stats_screen(self.current_screen)
         else:
             canvas = self._render_radar_screen(angle)
 
