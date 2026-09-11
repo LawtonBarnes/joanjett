@@ -40,6 +40,7 @@ import aircraft_screen  # noqa: E402
 import colors  # noqa: E402
 import compass  # noqa: E402
 import config  # noqa: E402
+import flightlog  # noqa: E402
 import info  # noqa: E402
 import mapdata  # noqa: E402
 import maprender  # noqa: E402
@@ -208,6 +209,7 @@ class JoanJettApp:
         self.info_font = pygame.font.Font(str(FONT_PATH), info.FONT_SIZE)
 
         self.tracked_planes = {}  # hex -> planes.TrackedPlane
+        self.flightlog = flightlog.FlightLog()
         self._prev_sweep_angle = 0.0
         self._latest_aircraft = []
         self._aircraft_fetch_ok = False
@@ -312,6 +314,7 @@ class JoanJettApp:
         live = aircraft.fetch_aircraft(s.location_lat, s.location_lon, s.max_tracked)
         self._aircraft_fetch_ok = live is not None
         self._latest_aircraft = live or []
+        self.flightlog.update(self._latest_aircraft)
         planes.update_tracked(
             self.tracked_planes, self._latest_aircraft, self._prev_sweep_angle, current_angle, s.trail_length
         )

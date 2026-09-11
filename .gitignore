@@ -1,3 +1,7 @@
 __pycache__/
 *.pyc
 cache/
+data/
+flightlog_push_key
+flightlog_push_key.pub
+flightlog_known_hosts

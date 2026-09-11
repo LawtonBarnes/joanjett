@@ -13,6 +13,26 @@ import geo
 
 AIRCRAFT_JSON_PATH = "/run/readsb/aircraft.json"
 
+# ADS-B (DO-260B) emitter category -> up to-10-char display label, per user
+# spec 2026-09-11. Lives here (not in aircraft_screen.py, where it was
+# first added) since flightlog.py needs the same mapping -- shared within
+# this app, unlike the deliberate per-app duplication convention between
+# sibling apps (bars/loudness/channel38/joanjett) elsewhere in the fleet.
+# Falls back to "UNKNOWN" for anything not in this table (matches the
+# A0/B0/C0/C6/C7 "unknown/reserved" entries below).
+CATEGORY_LABELS = {
+    "A0": "UNKNOWN", "A1": "LIGHT", "A2": "SMALL", "A3": "LARGE",
+    "A4": "HI VORTEX", "A5": "HEAVY", "A6": "HIGH SPEED", "A7": "HELICOPTER",
+    "B0": "UNKNOWN", "B1": "GLIDER", "B2": "BLIMP", "B3": "PARACHUTE",
+    "B4": "ULTRALIGHT", "B5": "RESERVED", "B6": "DRONE", "B7": "ROCKET",
+    "C0": "UNKNOWN", "C1": "EMER VEH", "C2": "SERV VEH", "C3": "OBSTACLE",
+    "C4": "OBSTACLE", "C5": "OBSTACLE", "C6": "UNKNOWN", "C7": "UNKNOWN",
+}
+
+
+def format_category(category):
+    return CATEGORY_LABELS.get(category, "UNKNOWN")
+
 
 def fetch_aircraft(center_lat, center_lon, max_tracked):
     """-> up to max_tracked aircraft dicts, nearest first, or None on a
