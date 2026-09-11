@@ -21,12 +21,36 @@ UNDERSCAN_FRACTION = 0.08  # matches info.py
 
 MAX_ROWS = 6  # user request 2026-09-11 -- was 8 (2026-08-25), before that unbounded (up to MAX_TRACKED=10)
 
+# ADS-B (DO-260B) emitter category -> up to-10-char display label, per user
+# spec 2026-09-11. Falls back to "UNKNOWN" for anything not in this table
+# (matches the A0/B0/C0/C6/C7 "unknown/reserved" entries below).
+CATEGORY_LABELS = {
+    "A0": "UNKNOWN", "A1": "LIGHT", "A2": "SMALL", "A3": "LARGE",
+    "A4": "HI VORTEX", "A5": "HEAVY", "A6": "HIGH SPEED", "A7": "HELICOPTER",
+    "B0": "UNKNOWN", "B1": "GLIDER", "B2": "BLIMP", "B3": "PARACHUTE",
+    "B4": "ULTRALIGHT", "B5": "RESERVED", "B6": "DRONE", "B7": "ROCKET",
+    "C0": "UNKNOWN", "C1": "EMER VEH", "C2": "SERV VEH", "C3": "OBSTACLE",
+    "C4": "OBSTACLE", "C5": "OBSTACLE", "C6": "UNKNOWN", "C7": "UNKNOWN",
+}
+
+
+def format_category(category):
+    return CATEGORY_LABELS.get(category, "UNKNOWN")
+
+
 COLUMNS = [
     ("CALLSIGN", 9, "left"),
     ("ALT", 7, "right"),
     ("SPD", 6, "right"),
     ("DIST", 7, "right"),
     ("TRK", 6, "right"),
+    # Width 11 = 1 leading space (user's explicit "space before it") + up to
+    # the longest label's 10 characters (HELICOPTER/HIGH SPEED/ULTRALIGHT).
+    # The leading space is baked into both the header text below and each
+    # row's value (see the row-building loop) so the gap is consistent --
+    # unlike the numeric columns, a left-aligned text column right after
+    # TRK's right-aligned field has no gap otherwise.
+    (" TYPE", 11, "left"),
 ]
 
 
@@ -92,6 +116,7 @@ def render_aircraft_screen(size, live_aircraft, fetch_ok, settings, range_multip
                 round(gs) if gs is not None else "N/A",
                 f"{ac['dist_nm']:.1f}",
                 f"{round(ac['heading_deg'])}°",
+                " " + format_category(ac.get("category")),
             ]
         )
         y += _draw_boxed_line(layer, font, row_text, info_color, (table_x, y), align="left")
