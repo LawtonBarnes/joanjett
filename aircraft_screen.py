@@ -19,7 +19,7 @@ BOX_PAD_Y = 2
 BOX_ALPHA = 64  # 25% opacity, matching the Info HUD's boxes
 UNDERSCAN_FRACTION = 0.08  # matches info.py
 
-MAX_ROWS = 8  # user request 2026-08-25 -- was unbounded (up to MAX_TRACKED=10)
+MAX_ROWS = 6  # user request 2026-09-11 -- was 8 (2026-08-25), before that unbounded (up to MAX_TRACKED=10)
 
 COLUMNS = [
     ("CALLSIGN", 9, "left"),
