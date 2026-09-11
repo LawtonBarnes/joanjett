@@ -141,7 +141,8 @@ def render_planes(tracked, center_lat, center_lon, range_nm, plane_color, font, 
             layer.blit(box, (pos[0] + ARROWHEAD_WIDTH, pos[1] - box.get_height() / 2))
 
     for plane, px_points in plane_data:
-        _draw_faded_trail(layer, px_points, plane_color, TRAIL_WIDTH)
+        trail_color = helicopter_color if plane.is_helicopter else plane_color
+        _draw_faded_trail(layer, px_points, trail_color, TRAIL_WIDTH)
 
         pos = px_points[-1]
         dx, dy = _heading_unit_vector(plane.heading_deg)
