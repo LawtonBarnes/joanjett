@@ -1,18 +1,20 @@
-"""AIRCRAFT BY CATEGORY -- a fixed reference table (CODE/LABEL/MAX WEIGHT/
-NUM) of the ADS-B emitter categories in aircraft.CATEGORY_LABELS, each row's
-NUM cross-referenced against flightlog's local CSV. Replaces the two pie-
+"""AIRCRAFT BY CATEGORY -- a table (CODE/LABEL/MAX WEIGHT/NUM) of the
+ADS-B emitter categories in aircraft.CATEGORY_LABELS, each row's NUM
+cross-referenced against flightlog's local CSV. Replaces the two pie-
 chart screens (stats_screen.py, removed 2026-09-12 per user request -- "I
 like the tables better than the pie charts"). Same plain-map/no-radar-
 layers/yellow-label-white-data/25%-opacity-boxed VCR OSD Mono treatment as
 aircraft_screen.py/airline_screen.py.
 
-Deliberately shown in fixed taxonomy order, not sorted by count like the
-Aircraft/Airline tables -- this is a legend of what the categories *mean*,
-not a ranking. UNKNOWN (A0/B0/C0/C6/C7) and RESERVED (B5) codes are omitted
--- they carry no real weight-class meaning, matching the descriptions the
-user actually asked for. C4/C5 (also labeled OBSTACLE, same as C3) are
-folded into C3's single "towers, structures" row rather than getting
-duplicate rows, per the exact 16-entry list given.
+Sorted descending by NUM and capped at MAX_ROWS, same ranking convention
+as the Aircraft/Airline tables (changed 2026-09-12 from the original fixed
+taxonomy order, per user follow-up request). Categories with 0 detections
+are skipped entirely. UNKNOWN (A0/B0/C0/C6/C7) and RESERVED (B5) codes are
+omitted from CATEGORY_TABLE altogether -- they carry no real weight-class
+meaning, matching the descriptions the user actually asked for. C4/C5
+(also labeled OBSTACLE, same as C3) are folded into C3's single "TOWERS,
+STRUCTURES" row rather than getting duplicate rows, per the exact
+16-entry list given.
 """
 import csv
 import os
@@ -23,37 +25,37 @@ import colors
 import flightlog
 
 FONT_SIZE = 22  # matches aircraft_screen.py -- reuses main.py's aircraft_screen_font
+LINE_HEIGHT = 22  # matches airline_screen.py -- used only for the title/header skip
 BOX_PAD_X = 4
-# Measured against the real font (20px intrinsic height at 22pt): 18 boxed
-# lines (title + header + 16 data rows) at pad=1 -> 22px/row -> 396px,
-# fitting the 403.2px usable height (480 frame, 8% underscan). No blank
-# "skip" spacer lines like aircraft_screen.py/airline_screen.py use --
-# there isn't vertical room to spare with this many rows.
-BOX_PAD_Y = 1
+BOX_PAD_Y = 2  # matches aircraft_screen.py/airline_screen.py -- MAX_ROWS=12 leaves
+# enough vertical room now that 0-count rows are skipped, no need for the
+# tighter pad=1 the original all-16-rows version needed.
 BOX_ALPHA = 64  # 25% opacity, matching every other boxed-text screen
 UNDERSCAN_FRACTION = 0.08  # matches aircraft_screen.py
+
+MAX_ROWS = 12  # user request 2026-09-12
 
 # (code, label, max weight / description). Order and wording per user
 # request 2026-09-12, except B4's description shortened ("Ultralight,
 # hang-gliders" vs. the fuller "Ultralight aircraft, hang-gliders") to fit
 # the MAX WEIGHT column width measured against the real font below.
 CATEGORY_TABLE = [
-    ("A1", "LIGHT", "< 15,500 lbs"),
-    ("A2", "SMALL", "15,500 - 75,000 lbs"),
-    ("A3", "LARGE", "75,000 - 300,000 lbs"),
-    ("A4", "HI VORTEX", "unusual wake turbulence"),
-    ("A5", "HEAVY", "> 300,000 lbs"),
-    ("A6", "HIGH SPEED", "> 5g acceleration"),
-    ("A7", "HELICOPTER", "helicopters, tilt-rotors"),
-    ("B1", "GLIDER", "Gliders, sailplanes"),
-    ("B2", "BLIMP", "Airships, blimps, balloons"),
-    ("B3", "PARACHUTE", "Skydivers, parachutists"),
-    ("B4", "ULTRALIGHT", "Ultralight, hang-gliders"),
-    ("B6", "DRONE", "UAV, Drones"),
-    ("B7", "ROCKET", "Space vehicles"),
-    ("C1", "EMER VEH", "airport vehicle"),
-    ("C2", "SERV VEH", "airport vehicle"),
-    ("C3", "OBSTACLE", "towers, structures"),
+    ("A1", "LIGHT", "< 15,500 LBS"),
+    ("A2", "SMALL", "15,500 - 75,000 LBS"),
+    ("A3", "LARGE", "75,000 - 300,000 LBS"),
+    ("A4", "HI VORTEX", "UNUSUAL WAKE TURBULENCE"),
+    ("A5", "HEAVY", "> 300,000 LBS"),
+    ("A6", "HIGH SPEED", "> 5G ACCELERATION"),
+    ("A7", "HELICOPTER", "HELICOPTERS, TILT-ROTORS"),
+    ("B1", "GLIDER", "GLIDERS, SAILPLANES"),
+    ("B2", "BLIMP", "AIRSHIPS, BLIMPS, BALLOONS"),
+    ("B3", "PARACHUTE", "SKYDIVERS, PARACHUTISTS"),
+    ("B4", "ULTRALIGHT", "ULTRALIGHT, HANG-GLIDERS"),
+    ("B6", "DRONE", "UAV, DRONES"),
+    ("B7", "ROCKET", "SPACE VEHICLES"),
+    ("C1", "EMER VEH", "AIRPORT VEHICLE"),
+    ("C2", "SERV VEH", "AIRPORT VEHICLE"),
+    ("C3", "OBSTACLE", "TOWERS, STRUCTURES"),
 ]
 
 # Widths measured against the real VCR OSD Mono 22pt font (13px/char) --
@@ -109,6 +111,19 @@ def _counts_by_label():
     return counts
 
 
+def _ranked_rows():
+    """-> up to MAX_ROWS (code, label, desc, count) tuples, descending by
+    count, 0-count categories dropped entirely."""
+    counts = _counts_by_label()
+    rows = [
+        (code, label, desc, counts.get(label, 0))
+        for code, label, desc in CATEGORY_TABLE
+        if counts.get(label, 0) > 0
+    ]
+    rows.sort(key=lambda r: r[3], reverse=True)
+    return rows[:MAX_ROWS]
+
+
 def _draw_boxed_segments(surface, font, segments, pos, align="left"):
     rendered = [font.render(text, True, color) for text, color in segments]
     total_w = sum(r.get_width() for r in rendered)
@@ -141,18 +156,23 @@ def render_category_screen(size, color_scheme, font):
     margin_x = w * UNDERSCAN_FRACTION
     margin_y = h * UNDERSCAN_FRACTION
 
-    counts = _counts_by_label()
+    ranked = _ranked_rows()
 
     y = margin_y
     y += _draw_boxed_line(layer, font, "AIRCRAFT BY CATEGORY", label_color, (w / 2, y), align="center")
+    y += LINE_HEIGHT  # skip a line between title and header, per user request
 
     header_text = _format_row([label for label, _, _ in COLUMNS])
     table_width = font.size(header_text)[0]
     table_x = max(margin_x, (w - table_width) / 2)
     y += _draw_boxed_line(layer, font, header_text, label_color, (table_x, y), align="left")
 
-    for code, label, desc in CATEGORY_TABLE:
-        row_text = _format_row([code, label, desc, counts.get(label, 0)])
-        y += _draw_boxed_line(layer, font, row_text, info_color, (table_x, y), align="left")
+    if not ranked:
+        y += LINE_HEIGHT
+        _draw_boxed_line(layer, font, "NO DATA YET", info_color, (w / 2, y), align="center")
+    else:
+        for code, label, desc, count in ranked:
+            row_text = _format_row([code, label, desc, count])
+            y += _draw_boxed_line(layer, font, row_text, info_color, (table_x, y), align="left")
 
     return layer
