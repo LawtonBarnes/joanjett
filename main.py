@@ -38,6 +38,7 @@ import pygame  # noqa: E402
 import aircraft  # noqa: E402
 import aircraft_screen  # noqa: E402
 import airline_screen  # noqa: E402
+import category_screen  # noqa: E402
 import colors  # noqa: E402
 import compass  # noqa: E402
 import config  # noqa: E402
@@ -47,7 +48,6 @@ import mapdata  # noqa: E402
 import maprender  # noqa: E402
 import planes  # noqa: E402
 import radar  # noqa: E402
-import stats_screen  # noqa: E402
 
 VERSION = config.VERSION
 
@@ -66,12 +66,14 @@ FRAME_INTERVAL = 1.0 / 20  # 20fps -- plenty smooth for a slow-rotating sweep,
 # writes are fine on this exact hardware)
 
 # Screens cycled via Left/Right. Settings (the spec's original 3-screen
-# plan) still isn't built; two new stats pages were added instead
-# 2026-09-11 once flightlog.py had accumulated enough data to be worth
-# looking at, and two more (airline breakdowns, cross-referenced against
-# the 123atc.com callsign/country lookup table) were added 2026-09-12.
+# plan) still isn't built. The original two pie-chart stats pages (by
+# callsign/by type, added 2026-09-11) were replaced 2026-09-12 with table
+# screens per user request ("I like the tables better than the pie
+# charts") -- two airline breakdowns (cross-referenced against the
+# 123atc.com callsign/country lookup table) plus a category legend
+# (cross-referenced against aircraft.CATEGORY_LABELS).
 SCREENS = [
-    "radar", "aircraft", "stats_callsign", "stats_type",
+    "radar", "aircraft", "category",
     "airline_intl", "airline_domestic",
 ]
 
@@ -376,17 +378,15 @@ class JoanJettApp:
         canvas.blit(table_layer, (0, 0))
         return canvas
 
-    def _render_stats_screen(self, screen_name):
+    def _render_category_screen(self):
         # Same plain-map/no-radar-layers treatment as the Aircraft screen
-        # above -- the pie chart doesn't need the compass/rings/sweep/
-        # planes any more than that table did.
+        # above.
         canvas = self.map_surface.copy()
         canvas.blit(self.vignette_surface, (0, 0))
-        mode = "callsign" if screen_name == "stats_callsign" else "type"
-        stats_layer = stats_screen.render_stats_screen(
-            (FRAME_W, FRAME_H), mode, self.settings.color_scheme, self.aircraft_screen_font,
+        category_layer = category_screen.render_category_screen(
+            (FRAME_W, FRAME_H), self.settings.color_scheme, self.aircraft_screen_font,
         )
-        canvas.blit(stats_layer, (0, 0))
+        canvas.blit(category_layer, (0, 0))
         return canvas
 
     def _render_airline_screen(self, screen_name):
@@ -406,8 +406,8 @@ class JoanJettApp:
 
         if self.current_screen == "aircraft":
             canvas = self._render_aircraft_screen(angle)
-        elif self.current_screen in ("stats_callsign", "stats_type"):
-            canvas = self._render_stats_screen(self.current_screen)
+        elif self.current_screen == "category":
+            canvas = self._render_category_screen()
         elif self.current_screen in ("airline_intl", "airline_domestic"):
             canvas = self._render_airline_screen(self.current_screen)
         else:
