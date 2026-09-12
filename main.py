@@ -37,6 +37,7 @@ import pygame  # noqa: E402
 
 import aircraft  # noqa: E402
 import aircraft_screen  # noqa: E402
+import airline_screen  # noqa: E402
 import colors  # noqa: E402
 import compass  # noqa: E402
 import config  # noqa: E402
@@ -67,8 +68,12 @@ FRAME_INTERVAL = 1.0 / 20  # 20fps -- plenty smooth for a slow-rotating sweep,
 # Screens cycled via Left/Right. Settings (the spec's original 3-screen
 # plan) still isn't built; two new stats pages were added instead
 # 2026-09-11 once flightlog.py had accumulated enough data to be worth
-# looking at.
-SCREENS = ["radar", "aircraft", "stats_callsign", "stats_type"]
+# looking at, and two more (airline breakdowns, cross-referenced against
+# the 123atc.com callsign/country lookup table) were added 2026-09-12.
+SCREENS = [
+    "radar", "aircraft", "stats_callsign", "stats_type",
+    "airline_intl", "airline_domestic",
+]
 
 # See bars.py -- Home exits with this so a future menu/STRINGS integration
 # can jump straight to Health Monitor. No menu.py consumes it yet on this
@@ -384,6 +389,17 @@ class JoanJettApp:
         canvas.blit(stats_layer, (0, 0))
         return canvas
 
+    def _render_airline_screen(self, screen_name):
+        # Same plain-map/no-radar-layers treatment as Aircraft/Stats above.
+        canvas = self.map_surface.copy()
+        canvas.blit(self.vignette_surface, (0, 0))
+        mode = "international" if screen_name == "airline_intl" else "domestic"
+        airline_layer = airline_screen.render_airline_screen(
+            (FRAME_W, FRAME_H), mode, self.settings.color_scheme, self.aircraft_screen_font,
+        )
+        canvas.blit(airline_layer, (0, 0))
+        return canvas
+
     def render(self):
         angle = self.sweep_angle()
         self.update_planes(angle)
@@ -392,6 +408,8 @@ class JoanJettApp:
             canvas = self._render_aircraft_screen(angle)
         elif self.current_screen in ("stats_callsign", "stats_type"):
             canvas = self._render_stats_screen(self.current_screen)
+        elif self.current_screen in ("airline_intl", "airline_domestic"):
+            canvas = self._render_airline_screen(self.current_screen)
         else:
             canvas = self._render_radar_screen(angle)
 
