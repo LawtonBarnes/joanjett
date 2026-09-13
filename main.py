@@ -220,6 +220,12 @@ class JoanJettApp:
 
         self.tracked_planes = {}  # hex -> planes.TrackedPlane
         self.flightlog = flightlog.FlightLog()
+        # Best-effort, no-op on a host with no pull key (see flightlog.py) --
+        # picks up whatever the other radio (if any) has logged to MP since
+        # this host last ran, before this session's own stats screens read
+        # the local file. Added 2026-09-12 once production started running
+        # JOAN JETT alongside this host.
+        flightlog.sync_and_merge()
         self._prev_sweep_angle = 0.0
         self._latest_aircraft = []
         self._aircraft_fetch_ok = False

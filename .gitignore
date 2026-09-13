@@ -4,4 +4,6 @@ cache/
 data/
 flightlog_push_key
 flightlog_push_key.pub
+flightlog_pull_key
+flightlog_pull_key.pub
 flightlog_known_hosts
