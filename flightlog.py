@@ -183,6 +183,21 @@ def _valid_row(row):
     return bool(row.get("callsign"))
 
 
+def _normalize_military(row):
+    """A row that's otherwise valid (real date/time/callsign) but short
+    the 'military' field entirely -- e.g. one written by an
+    already-running older process during the brief window between this
+    column being added to a CSV's header and that process actually being
+    relaunched with the code that populates it -- reads back from
+    csv.DictReader as '' or None rather than 'Y'/'N'/'N/A'. Never let
+    that reach the rewritten CSV as a raw empty field: treat it the same
+    as a genuinely pre-migration row (data was never captured for it),
+    not as a false 'N'."""
+    if not row.get("military"):
+        row["military"] = "N/A"
+    return row
+
+
 def _pick_representative(cluster):
     """Prefer a row with a real (non-N/A) squawk; among ties (both real or
     both N/A), the earliest chronologically -- per user's exact 2026-09-12
@@ -203,7 +218,7 @@ def _dedup(rows):
     row, so a real cross-radio duplicate pair (normally just 2 rows,
     seconds apart) merges cleanly without needing every row in a longer
     same-day sequence to be within the window of the *first* one."""
-    valid = [r for r in rows if _valid_row(r)]
+    valid = [_normalize_military(r) for r in rows if _valid_row(r)]
     by_callsign = {}
     for row in valid:
         by_callsign.setdefault(row["callsign"], []).append(row)
