@@ -71,7 +71,7 @@ MAX_WEIGHT_WIDTH = max(len(desc) for _, _, desc in CATEGORY_TABLE)
 
 COLUMNS = [
     ("CD", 2, "left"),
-    ("LABEL", 10, "left"),
+    ("TYPE", 10, "left"),
     ("MAX WEIGHT", MAX_WEIGHT_WIDTH, "left"),
     ("NUM", 5, "right"),
 ]
