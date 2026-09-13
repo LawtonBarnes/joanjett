@@ -4,7 +4,7 @@ layer writes this same file back out, so it needs to stay easy to round-trip."""
 import configparser
 import os
 
-VERSION = "1.2"
+VERSION = "1.3"
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 SETTINGS_PATH = os.path.join(SCRIPT_DIR, "settings.ini")
