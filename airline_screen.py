@@ -30,9 +30,13 @@ LOOKUP_PATH = SCRIPT_DIR / "data" / "callsigns_with_country.csv"
 DOMESTIC_COUNTRY = "United States"
 
 # AIRLINE gets more room on the domestic table since it doesn't need to
-# share the line with a COUNTRY column.
-AIRLINE_WIDTH_INTL = 20
-COUNTRY_WIDTH = 14
+# share the line with a COUNTRY column. On the international table, AIRLINE
+# is truncated to 14 (per user request 2026-09-12 -- the mode of AIRLINE
+# name lengths across the full lookup table is 7 chars, so 14 covers most
+# names with only the rare long ones like "IRAQI PRESIDENTIAL FLIGHT"
+# actually truncating) with the 6 chars freed up handed to COUNTRY instead.
+AIRLINE_WIDTH_INTL = 14
+COUNTRY_WIDTH = 20
 AIRLINE_WIDTH_DOMESTIC = 30
 
 INTL_COLUMNS = [
