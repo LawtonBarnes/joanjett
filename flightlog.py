@@ -20,7 +20,14 @@ LOG_RADIUS_NM = 9
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 LOCAL_LOG_PATH = SCRIPT_DIR / "data" / "flightlog.csv"
-LOG_HEADER = ["date", "time", "callsign", "type", "altitude_ft", "squawk"]
+LOG_HEADER = ["date", "time", "callsign", "type", "altitude_ft", "squawk", "military"]
+# "Y"/"N" from readsb's dbFlags bit 0 (see aircraft.fetch_aircraft), or
+# "N/A" for any row logged before this column existed 2026-09-12 -- kept
+# distinct from "N" so old rows read as "not measured", not "measured and
+# not military". Bit 0 is the only military-adjacent signal readsb
+# exposes; there's no separate "government (non-military)" flag to also
+# capture here, so a Coast Guard/FAA-type aircraft with no military
+# ICAO-address flag won't be caught by this column.
 
 # Dedicated key, authorized on MP with a forced command
 # ("cat >> .../joanjett_flightlog.csv") restricted to appending to that
@@ -71,6 +78,7 @@ def _format_row(rec):
         aircraft.format_category(rec["category"]),
         str(alt) if alt is not None else "N/A",
         str(squawk) if squawk else "N/A",
+        "Y" if rec["military"] else "N",
     ]
 
 
@@ -101,6 +109,7 @@ class FlightLog:
                     "min_dist_nm": ac["dist_nm"],
                     "alt_ft": ac.get("alt_baro"),
                     "squawk": ac.get("squawk"),
+                    "military": ac.get("military", False),
                     "time": now,
                 }
         # A pass finalizes the instant its aircraft is no longer within
