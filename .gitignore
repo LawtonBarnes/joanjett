@@ -1,7 +1,12 @@
 __pycache__/
 *.pyc
 cache/
-data/
+# Only the live per-host growing log is ignored -- data/callsigns_with_country.csv
+# is a static reference table (airline_screen.py's lookup) and needs to be
+# tracked so a fresh clone on a new host (like production, 2026-09-12) has
+# it without a manual copy step.
+data/flightlog.csv
+data/flightlog.csv.tmp
 flightlog_push_key
 flightlog_push_key.pub
 flightlog_pull_key
