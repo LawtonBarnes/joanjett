@@ -60,14 +60,20 @@ CATEGORY_TABLE = [
     ("C3", "OBSTACLE", "STRUCTURE"),
 ]
 
-# Widths measured against the real VCR OSD Mono 22pt font (13px/char) --
-# total row = 2+1+10+1+27+1+4 = 46 chars = 598px, fits the 604.8px usable
-# width (720 frame, 8% underscan each side) with a little to spare.
+# Calculated, not hand-measured, so a future edit to CATEGORY_TABLE's
+# descriptions can't silently drift out of sync with a stale literal --
+# whatever the longest desc string is, that's the column width (currently
+# 14, from "OR HOT AIR BAL"/"OR HANG GLIDER"). NUM is fixed at 5 digits
+# (not calculated) per user request 2026-09-12, since real counts are
+# still 2-3 digits today but should have headroom for 5 once a lot more
+# data has been collected, rather than needing another width bump later.
+MAX_WEIGHT_WIDTH = max(len(desc) for _, _, desc in CATEGORY_TABLE)
+
 COLUMNS = [
     ("CD", 2, "left"),
     ("LABEL", 10, "left"),
-    ("MAX WEIGHT", 27, "left"),
-    ("NUM", 4, "right"),
+    ("MAX WEIGHT", MAX_WEIGHT_WIDTH, "left"),
+    ("NUM", 5, "right"),
 ]
 
 
