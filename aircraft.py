@@ -22,7 +22,7 @@ AIRCRAFT_JSON_PATH = "/run/readsb/aircraft.json"
 # A0/B0/C0/C6/C7 "unknown/reserved" entries below).
 CATEGORY_LABELS = {
     "A0": "UNKNOWN", "A1": "LIGHT", "A2": "SMALL", "A3": "LARGE",
-    "A4": "HI VORTEX", "A5": "HEAVY", "A6": "HIGH SPEED", "A7": "HELICOPTER",
+    "A4": "HI VORTEX", "A5": "HEAVY", "A6": "HIGH SPEED", "A7": "ROTOR",
     "B0": "UNKNOWN", "B1": "GLIDER", "B2": "BLIMP", "B3": "PARACHUTE",
     "B4": "ULTRALIGHT", "B5": "RESERVED", "B6": "DRONE", "B7": "ROCKET",
     "C0": "UNKNOWN", "C1": "EMER VEH", "C2": "SERV VEH", "C3": "OBSTACLE",

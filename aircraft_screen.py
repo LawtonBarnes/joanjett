@@ -1,4 +1,4 @@
-"""AIRCRAFT screen -- full data table (CALLSIGN/ALT/SPD/DIST/TRK) of every
+"""AIRCRAFT screen -- full data table (CALLSIGN/ALT/SPD/DIST/HDG) of every
 tracked aircraft, plus a status footer. One of the screens cycled via
 Left/Right (Radar / Aircraft / Settings, per user's confirmed 3-screen
 plan). Per user request 2026-08-25: VCR OSD Mono font, yellow-label/
@@ -27,13 +27,14 @@ COLUMNS = [
     ("ALT", 7, "right"),
     ("SPD", 6, "right"),
     ("DIST", 7, "right"),
-    ("TRK", 6, "right"),
+    ("HDG", 6, "right"),
     # Width 11 = 1 leading space (user's explicit "space before it") + up to
-    # the longest label's 10 characters (HELICOPTER/HIGH SPEED/ULTRALIGHT).
+    # the longest label's 10 characters (HIGH SPEED/ULTRALIGHT -- HELICOPTER
+    # was the longest until it was renamed ROTOR 2026-09-12).
     # The leading space is baked into both the header text below and each
     # row's value (see the row-building loop) so the gap is consistent --
     # unlike the numeric columns, a left-aligned text column right after
-    # TRK's right-aligned field has no gap otherwise.
+    # HDG's right-aligned field has no gap otherwise.
     (" TYPE", 11, "left"),
 ]
 

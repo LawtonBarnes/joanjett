@@ -35,27 +35,29 @@ UNDERSCAN_FRACTION = 0.08  # matches aircraft_screen.py
 
 MAX_ROWS = 12  # user request 2026-09-12
 
-# (code, label, max weight / description). Order and wording per user
-# request 2026-09-12, except B4's description shortened ("Ultralight,
-# hang-gliders" vs. the fuller "Ultralight aircraft, hang-gliders") to fit
-# the MAX WEIGHT column width measured against the real font below.
+# (code, label, max weight / description). Labels/descriptions shortened
+# again 2026-09-12 per user request for terser abbreviations across the
+# app (A7's label changed HELICOPTER -> ROTOR here too, see the matching
+# rename in aircraft.CATEGORY_LABELS -- flightlog.csv rows logged under
+# the old "HELICOPTER" text were migrated to "ROTOR" at the same time so
+# _counts_by_label()'s exact-string match keeps counting them).
 CATEGORY_TABLE = [
-    ("A1", "LIGHT", "< 15,500 LBS"),
-    ("A2", "SMALL", "15,500 - 75,000 LBS"),
-    ("A3", "LARGE", "75,000 - 300,000 LBS"),
-    ("A4", "HI VORTEX", "UNUSUAL WAKE TURBULENCE"),
-    ("A5", "HEAVY", "> 300,000 LBS"),
-    ("A6", "HIGH SPEED", "> 5G ACCELERATION"),
-    ("A7", "HELICOPTER", "HELICOPTERS, TILT-ROTORS"),
-    ("B1", "GLIDER", "GLIDERS, SAILPLANES"),
-    ("B2", "BLIMP", "AIRSHIPS, BLIMPS, BALLOONS"),
-    ("B3", "PARACHUTE", "SKYDIVERS, PARACHUTISTS"),
-    ("B4", "ULTRALIGHT", "ULTRALIGHT, HANG-GLIDERS"),
-    ("B6", "DRONE", "UAV, DRONES"),
-    ("B7", "ROCKET", "SPACE VEHICLES"),
-    ("C1", "EMER VEH", "AIRPORT VEHICLE"),
-    ("C2", "SERV VEH", "AIRPORT VEHICLE"),
-    ("C3", "OBSTACLE", "TOWERS, STRUCTURES"),
+    ("A1", "LIGHT", "<15.5K LBS"),
+    ("A2", "SMALL", "15-75K LBS"),
+    ("A3", "LARGE", "75-300K LBS"),
+    ("A4", "HI VORTEX", "HI WAKE TURB"),
+    ("A5", "HEAVY", ">300K LBS"),
+    ("A6", "HIGH SPEED", ">5G ACCEL"),
+    ("A7", "ROTOR", "HELICOPTER"),
+    ("B1", "GLIDER", "OR SAILPLANE"),
+    ("B2", "BLIMP", "OR HOT AIR BAL"),
+    ("B3", "PARACHUTE", "SKYDIVERS"),
+    ("B4", "ULTRALIGHT", "OR HANG GLIDER"),
+    ("B6", "DRONE", "OR UAV"),
+    ("B7", "ROCKET", "SPACECRAFT"),
+    ("C1", "EMER VEH", "AIRPORT SURF"),
+    ("C2", "SERV VEH", "AIRPORT SURF"),
+    ("C3", "OBSTACLE", "STRUCTURE"),
 ]
 
 # Widths measured against the real VCR OSD Mono 22pt font (13px/char) --
