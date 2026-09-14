@@ -149,25 +149,30 @@ SPLASH_TEXT_GAP = 12  # below the image, before the first text line
 SPLASH_LINE_GAP = 4  # between the two text lines
 
 
-def show_splash(fb, font, version_text, range_nm):
-    """Blocking splash at launch, centered at native resolution -- NOT
-    scaled to fit (unlike bars.py's splash, which is scaled since its
-    source art matches the frame's aspect ratio). JOAN JETT's splash.png is
-    500x281, well under the 720x480 frame, and scaling it up would blur a
-    small image (caught live 2026-08-25 before ever shipping this version).
-    Any failure (no splash.png deployed, bad image) just skips straight to
-    normal startup rather than taking the app down over a cosmetic feature.
+def build_splash_base(font, version_text):
+    """Returns (base_canvas, status_line_y) -- the static image+VERSION
+    portion of the splash, centered at native resolution -- NOT scaled to
+    fit (unlike bars.py's splash, which is scaled since its source art
+    matches the frame's aspect ratio). JOAN JETT's splash.png is 500x281,
+    well under the 720x480 frame, and scaling it up would blur a small
+    image (caught live 2026-08-25 before ever shipping this version).
+    Returns (None, 0) on any failure (no splash.png deployed, bad image) --
+    callers skip straight to normal startup rather than taking the app
+    down over a cosmetic feature.
 
-    Image is shifted up (SPLASH_IMAGE_OFFSET_Y) to leave room for two
-    centered orange (colors.ORANGE) status lines underneath -- VERSION and
-    the current map-load range, per user request."""
+    Image is shifted up (SPLASH_IMAGE_OFFSET_Y) to leave room for a
+    centered orange (colors.ORANGE) VERSION line plus one more line below
+    it -- the caller's dynamic status text, drawn separately via
+    draw_splash_status() once per real startup phase (map load, log sync)
+    so the splash reflects what's actually happening rather than a fixed
+    decorative line."""
     if not SPLASH_PATH.exists():
-        return
+        return None, 0
     try:
         img = pygame.image.load(str(SPLASH_PATH)).convert()
     except (pygame.error, OSError) as exc:
         print(f"Splash load failed: {exc}", file=sys.stderr)
-        return
+        return None, 0
     canvas = pygame.Surface((FRAME_W, FRAME_H))
     canvas.fill(BLACK)
     img_w, img_h = img.get_size()
@@ -177,14 +182,27 @@ def show_splash(fb, font, version_text, range_nm):
 
     text_color = colors.rgb(colors.ORANGE)
     line1 = font.render(f"VERSION {version_text}", True, text_color)
-    line2 = font.render(f"LOADING MAPS {range_nm}NM", True, text_color)
     y = img_y + img_h + SPLASH_TEXT_GAP
     canvas.blit(line1, ((FRAME_W - line1.get_width()) // 2, y))
-    y += line1.get_height() + SPLASH_LINE_GAP
-    canvas.blit(line2, ((FRAME_W - line2.get_width()) // 2, y))
+    status_y = y + line1.get_height() + SPLASH_LINE_GAP
+    return canvas, status_y
 
+
+def draw_splash_status(fb, splash_base, status_y, font, status_text):
+    """Draws splash_base plus one dynamic status line (replacing whatever
+    was there before) and writes it straight to the framebuffer -- called
+    once per real startup phase so the on-screen text matches what's
+    actually happening (e.g. "LOADING MAPS 12NM" while the map fetch is
+    in flight, "SYNCHRONIZING LOGS" while pulling/merging MP's flightlog),
+    not a fixed decorative line shown for an arbitrary duration. No-op if
+    splash_base is None (splash.png missing/bad -- see build_splash_base)."""
+    if splash_base is None:
+        return
+    canvas = splash_base.copy()
+    text_color = colors.rgb(colors.ORANGE)
+    line = font.render(status_text, True, text_color)
+    canvas.blit(line, ((FRAME_W - line.get_width()) // 2, status_y))
     fb.write_surface(canvas)
-    time.sleep(SPLASH_SECONDS)
 
 
 class JoanJettApp:
@@ -220,12 +238,6 @@ class JoanJettApp:
 
         self.tracked_planes = {}  # hex -> planes.TrackedPlane
         self.flightlog = flightlog.FlightLog()
-        # Best-effort, no-op on a host with no pull key (see flightlog.py) --
-        # picks up whatever the other radio (if any) has logged to MP since
-        # this host last ran, before this session's own stats screens read
-        # the local file. Added 2026-09-12 once production started running
-        # JOAN JETT alongside this host.
-        flightlog.sync_and_merge()
         self._prev_sweep_angle = 0.0
         self._latest_aircraft = []
         self._aircraft_fetch_ok = False
@@ -263,7 +275,34 @@ class JoanJettApp:
         except OSError as exc:
             print(f"Console graphics mode not available: {exc}", file=sys.stderr)
 
-        show_splash(self.fb, self.status_font, VERSION, self.range_multiplier * 4)
+        # Splash now does real work behind it instead of just sitting on
+        # screen for a fixed duration -- the status line is redrawn once
+        # per phase to reflect what's actually happening. Order (map, then
+        # log sync) is per user request 2026-09-14. SPLASH_SECONDS is kept
+        # as a floor, not shown per-phase: real work (map fetch, MP
+        # SSH pull/merge) can easily finish faster than the old fixed 5s
+        # splash, and padding at the end preserves the branding-visibility
+        # duration bars.py's splash also uses without truncating either
+        # status line if the network is slow. If work takes longer than
+        # SPLASH_SECONDS, it just proceeds the moment both phases finish --
+        # no artificial extra wait.
+        splash_start = time.monotonic()
+        splash_base, splash_status_y = build_splash_base(self.status_font, VERSION)
+        draw_splash_status(
+            self.fb, splash_base, splash_status_y, self.status_font,
+            f"LOADING MAPS {self.range_multiplier * 4}NM",
+        )
+        self.rebuild_map(show_loading_screen=False)
+        draw_splash_status(self.fb, splash_base, splash_status_y, self.status_font, "SYNCHRONIZING LOGS")
+        # Best-effort, no-op on a host with no pull key (see flightlog.py) --
+        # picks up whatever the other radio (if any) has logged to MP since
+        # this host last ran, before this session's own stats screens read
+        # the local file. Added 2026-09-12 once production started running
+        # JOAN JETT alongside this host.
+        flightlog.sync_and_merge()
+        remaining = SPLASH_SECONDS - (time.monotonic() - splash_start)
+        if remaining > 0:
+            time.sleep(remaining)
 
     def _handle_signal(self, signum, frame):
         self._quit_requested = True
@@ -460,7 +499,9 @@ class JoanJettApp:
 
     def run(self):
         try:
-            self.rebuild_map(show_loading_screen=False)
+            # Map's already loaded during the splash sequence in __init__
+            # (see build_splash_base/draw_splash_status) -- no need to fetch
+            # it again here.
             self.sweep_start_time = time.monotonic()
             self._prev_sweep_angle = 0.0
             running = True
