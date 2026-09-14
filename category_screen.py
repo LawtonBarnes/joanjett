@@ -119,6 +119,24 @@ def _counts_by_label():
     return counts
 
 
+def _total_tracked():
+    """Every logged pass, not just the ones in CATEGORY_TABLE's 16 rows --
+    matches the pre-2026-09-12 pie-chart stats_screen.py's "TOTAL AIRCRAFT
+    TRACKED" stat, just moved here."""
+    return len(_load_flight_rows())
+
+
+def _since_date():
+    """MM/DD/YYYY of the earliest logged row, or None if the log is empty.
+    Rows are date-sorted YYYY-MM-DD, so plain string min() is chronological
+    without needing to parse each row as a real date."""
+    dates = [row["date"] for row in _load_flight_rows() if row.get("date")]
+    if not dates:
+        return None
+    yyyy, mm, dd = min(dates).split("-")
+    return f"{mm}/{dd}/{yyyy}"
+
+
 def _ranked_rows():
     """-> up to MAX_ROWS (code, label, desc, count) tuples, descending by
     count, 0-count categories dropped entirely."""
@@ -182,5 +200,15 @@ def render_category_screen(size, color_scheme, font):
         for code, label, desc, count in ranked:
             row_text = _format_row([code, label, desc, count])
             y += _draw_boxed_line(layer, font, row_text, info_color, (table_x, y), align="left")
+
+    # Footer -- total logged passes across every category (not just the
+    # MAX_ROWS shown above) and the earliest date in the log, per user
+    # request 2026-09-14. One blank line under the table first.
+    y += LINE_HEIGHT
+    since = _since_date()
+    segments = [("TOTAL TRACKED ", label_color), (f"{_total_tracked()} ", info_color)]
+    if since:
+        segments += [("SINCE ", label_color), (since, info_color)]
+    _draw_boxed_segments(layer, font, segments, (w / 2, y), align="center")
 
     return layer
