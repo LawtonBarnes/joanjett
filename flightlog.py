@@ -239,6 +239,50 @@ def _dedup(rows):
     return merged
 
 
+def _row_identity(row):
+    """Exact-match key for "does MP already have this row" -- deliberately
+    not the fuzzy DEDUP_WINDOW clustering _dedup() uses (that's for
+    collapsing two radios' independent close-approach snapshots of the
+    same real pass in the *displayed* merge). Here we're asking a much
+    narrower question: does MP's raw archive already contain this literal
+    row this host already wrote locally -- so a byte-for-byte comparison
+    is correct and a fuzzy one would risk silently never backfilling a
+    real distinct row that happens to look similar."""
+    return tuple(row.get(col) for col in LOG_HEADER)
+
+
+def _push_missing_rows_to_mp(missing_rows):
+    """Blocking append of this host's own rows that MP's canonical copy
+    doesn't have yet -- covers a push lost to a network hiccup, or one
+    killed mid-write by SIGTERM when the host is powered off (the
+    fire-and-forget per-pass push in _push_to_mp has no retry and isn't
+    waited on at shutdown). Safe to call with an empty list (no-op).
+    Blocking is fine here, unlike _push_to_mp -- this only runs once at
+    launch, not from the render loop, so there's no frame-pacing concern."""
+    if not missing_rows:
+        return True
+    payload = "".join(",".join(str(row.get(col, "")) for col in LOG_HEADER) + "\n" for row in missing_rows)
+    try:
+        result = subprocess.run(
+            [
+                "ssh", "-o", "ConnectTimeout=5", "-o", "BatchMode=yes",
+                "-o", "StrictHostKeyChecking=accept-new",
+                "-o", f"UserKnownHostsFile={KNOWN_HOSTS_PATH}",
+                "-i", REMOTE_SSH_KEY, REMOTE_HOST,
+            ],
+            input=payload, capture_output=True, text=True, timeout=15,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        print(f"flightlog: backfill push to MP failed: {exc}", file=sys.stderr, flush=True)
+        return False
+    if result.returncode != 0:
+        print(f"flightlog: backfill push to MP exited {result.returncode}: {result.stderr.strip()}",
+              file=sys.stderr, flush=True)
+        return False
+    print(f"flightlog: backfilled {len(missing_rows)} row(s) to MP that it didn't have yet", flush=True)
+    return True
+
+
 def _fetch_remote_rows():
     """-> list of row-dicts from MP's canonical copy, or None on any
     failure (unreachable, timeout, bad key, unparsable). The forced
@@ -270,18 +314,24 @@ def _fetch_remote_rows():
 
 def sync_and_merge():
     """Best-effort, called once at launch (main.py, before the app starts
-    reading LOCAL_LOG_PATH for its stats screens). Pulls MP's canonical
-    copy -- every pass either radio has ever pushed -- merges it with this
-    host's own local rows (covers a push that was lost to a network
-    hiccup and never reached MP), collapses cross-radio duplicates of the
-    same real pass, and rewrites the local CSV so the existing
-    local-file-only stats-screen code needs no changes.
+    reading LOCAL_LOG_PATH for its stats screens). Syncs in **both**
+    directions every launch, per user request 2026-09-15 after production
+    being powered off briefly (fan install) left it a few rows short of
+    MP's canonical copy:
+
+    1. Pushes (blocking) any of this host's own local rows MP doesn't
+       already have -- covers a fire-and-forget per-pass push lost to a
+       network hiccup, or one killed mid-write by SIGTERM at shutdown.
+    2. Pulls MP's canonical copy -- every pass either radio has ever
+       pushed, now including whatever step 1 just backfilled -- merges it
+       with this host's own local rows, collapses cross-radio duplicates
+       of the same real pass, and rewrites the local CSV so the existing
+       local-file-only stats-screen code needs no changes.
 
     No-ops entirely, leaving the local file exactly as it was, if this
-    host was never set up to sync (no REMOTE_PULL_KEY -- true for
-    production right now, which only pushes) or if MP is unreachable.
-    Must never raise or block startup for longer than the SSH timeout
-    above."""
+    host was never set up to sync (no REMOTE_PULL_KEY) or if MP is
+    unreachable. Must never raise or block startup for longer than the
+    SSH timeouts above."""
     if not REMOTE_PULL_KEY.exists():
         return
     remote_rows = _fetch_remote_rows()
@@ -293,6 +343,13 @@ def sync_and_merge():
             local_rows = list(csv.DictReader(f))
     except OSError:
         local_rows = []
+
+    remote_identities = {_row_identity(r) for r in remote_rows}
+    missing_from_remote = [r for r in local_rows if _valid_row(r) and _row_identity(r) not in remote_identities]
+    if _push_missing_rows_to_mp(missing_from_remote):
+        # Reflected in-memory for the merge below too, not just on MP's
+        # side -- no need to re-fetch just to see our own just-pushed rows.
+        remote_rows = remote_rows + missing_from_remote
 
     try:
         merged = _dedup(local_rows + remote_rows)
