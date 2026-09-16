@@ -13,6 +13,12 @@ import geo
 
 AIRCRAFT_JSON_PATH = "/run/readsb/aircraft.json"
 
+# Fallback callsign for a contact with no broadcast "flight" field -- shared
+# with flightlog.py, which needs to recognize this exact value: it's not a
+# real aircraft identity, so multiple UNKNOWN sightings can't be assumed to
+# be the same real aircraft the way two rows sharing a real callsign can.
+UNKNOWN_CALLSIGN = "UNKNOWN"
+
 # ADS-B (DO-260B) emitter category -> up to-10-char display label, per user
 # spec 2026-09-11. Lives here (not in aircraft_screen.py, where it was
 # first added) since flightlog.py needs the same mapping -- shared within
@@ -59,7 +65,7 @@ def fetch_aircraft(center_lat, center_lon, max_tracked):
         # No fallback to the raw hex address (2026-08-25, user request) --
         # a hex code isn't a real callsign, so an aircraft without a
         # "flight" field (no callsign broadcast yet) reads as UNKNOWN.
-        callsign = (ac.get("flight") or "").strip() or "UNKNOWN"
+        callsign = (ac.get("flight") or "").strip() or UNKNOWN_CALLSIGN
         aircraft.append(
             {
                 "hex": ac["hex"],

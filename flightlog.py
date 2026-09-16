@@ -217,15 +217,26 @@ def _dedup(rows):
     clustered by consecutive gap, not by distance from the cluster's first
     row, so a real cross-radio duplicate pair (normally just 2 rows,
     seconds apart) merges cleanly without needing every row in a longer
-    same-day sequence to be within the window of the *first* one."""
+    same-day sequence to be within the window of the *first* one.
+
+    aircraft.UNKNOWN_CALLSIGN is exempt from this clustering entirely
+    (2026-09-15, real bug found via a multi-day/multi-host merge): unlike a
+    real callsign, "UNKNOWN" isn't one aircraft's identity, it's a shared
+    fallback for *any* contact with no broadcast callsign -- two UNKNOWN
+    rows a few minutes apart are very likely two different real aircraft,
+    not one repeat visitor, so clustering them the same way silently
+    conflated unrelated planes into a single row."""
     valid = [_normalize_military(r) for r in rows if _valid_row(r)]
     by_callsign = {}
     for row in valid:
         by_callsign.setdefault(row["callsign"], []).append(row)
 
     merged = []
-    for group in by_callsign.values():
+    for callsign, group in by_callsign.items():
         group.sort(key=_parse_dt)
+        if callsign == aircraft.UNKNOWN_CALLSIGN:
+            merged.extend(group)
+            continue
         cluster = [group[0]]
         for row in group[1:]:
             if _parse_dt(row) - _parse_dt(cluster[-1]) <= DEDUP_WINDOW:
