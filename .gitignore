@@ -12,3 +12,6 @@ flightlog_push_key.pub
 flightlog_pull_key
 flightlog_pull_key.pub
 flightlog_known_hosts
+
+# Per-machine settings -- each host keeps its own; see settings.example.ini
+settings.ini

@@ -123,3 +123,13 @@ has the RTL-SDR dongle attached can actually run this usefully.
 - `colors.py` -- shared color constants
 - `config.py` -- static configuration + `VERSION`
 - `dev_snapshot.py` -- development/debugging helper, not needed at runtime
+
+## Per-machine settings
+
+`settings.ini` is per-machine and not tracked in git (each fleet host keeps
+its own values, e.g. calibration or preferences), so `git pull` never
+conflicts with it. A fresh install copies the template first:
+
+    cp settings.example.ini settings.ini
+
+If `settings.ini` is missing, the app falls back to its built-in defaults.
