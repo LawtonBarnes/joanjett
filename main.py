@@ -60,6 +60,8 @@ FONT_PATH = SCRIPT_DIR / "VCR_OSD_MONO_1.001.ttf"
 VIGNETTE_PATH = SCRIPT_DIR / "vignette.png"
 SPLASH_PATH = SCRIPT_DIR / "splash.png"
 SPLASH_SECONDS = 5.0  # same duration as bars.py's splash
+LOGO_PATH = SCRIPT_DIR / "metalshop-logo.png"  # ABOUT screen -- see draw_about_screen()
+ORANGE = (0xFF, 0xA5, 0x00)
 
 FRAME_INTERVAL = 1.0 / 20  # 20fps -- plenty smooth for a slow-rotating sweep,
 # cheap on a Pi 3B+ (LOUDNESS already proves continuous full-frame fb0
@@ -88,6 +90,58 @@ KD_TEXT = 0x00
 KD_GRAPHICS = 0x01
 
 FETCH_MARGIN = 1.3  # covers screen corners at ~1.27x range, see geo.py
+
+
+# ABOUT screen (2026-09-22, fleet-wide -- same layout in every app except
+# WX, duplicated per this codebase's no-shared-library convention). BACK
+# toggles it from the app's home level. Title top center, settings in the
+# middle, METAL SHOP logo bottom center. The logo is square-pixel art, so
+# it's stretched horizontally by 720/640 to look right on the CRT's
+# narrower-than-square 720x480 pixels.
+ABOUT_MARGIN_Y = 48  # keeps title/logo inside the CRT's visible area
+ABOUT_LINE_GAP = 8
+ABOUT_COLUMN_GAP = 16
+LOGO_X_STRETCH = 720 / 640
+
+
+def load_about_logo():
+    try:
+        img = pygame.image.load(str(LOGO_PATH)).convert_alpha()
+    except (pygame.error, OSError) as exc:
+        print(f"Logo load failed: {exc}", file=sys.stderr)
+        return None
+    w, h = img.get_size()
+    return pygame.transform.smoothscale(img, (round(w * LOGO_X_STRETCH), h))
+
+
+def draw_about_screen(canvas, title_font, body_font, logo, title, rows):
+    """`rows` is a list of (label, value) -- labels right-aligned in an
+    orange column, values left-aligned in white beside them, the block
+    centered in the space between the title and the logo. A row with an
+    empty label continues the previous row's value column."""
+    frame_w, frame_h = canvas.get_size()
+    canvas.fill(BLACK)
+    title_surf = title_font.render(title, True, ORANGE)
+    canvas.blit(title_surf, ((frame_w - title_surf.get_width()) // 2, ABOUT_MARGIN_Y))
+    top = ABOUT_MARGIN_Y + title_surf.get_height()
+    bottom = frame_h - ABOUT_MARGIN_Y
+    if logo is not None:
+        bottom -= logo.get_height()
+        canvas.blit(logo, ((frame_w - logo.get_width()) // 2, bottom))
+    if not rows:
+        return
+    label_surfs = [body_font.render(label, True, ORANGE) if label else None for label, _ in rows]
+    value_surfs = [body_font.render(str(value), True, WHITE) for _, value in rows]
+    label_w = max((l.get_width() for l in label_surfs if l), default=0)
+    value_w = max(v.get_width() for v in value_surfs)
+    line_h = body_font.get_linesize() + ABOUT_LINE_GAP
+    x0 = (frame_w - (label_w + ABOUT_COLUMN_GAP + value_w)) // 2
+    y = top + (bottom - top - line_h * len(rows)) // 2
+    for label_surf, value_surf in zip(label_surfs, value_surfs):
+        if label_surf:
+            canvas.blit(label_surf, (x0 + label_w - label_surf.get_width(), y))
+        canvas.blit(value_surf, (x0 + label_w + ABOUT_COLUMN_GAP, y))
+        y += line_h
 
 
 def find_keyboard_devices():
@@ -235,6 +289,10 @@ class JoanJettApp:
         # same day per follow-up user request.
         self.callsign_font = pygame.font.Font(str(FONT_PATH), planes.CALLSIGN_FONT_SIZE)
         self.info_font = pygame.font.Font(str(FONT_PATH), info.FONT_SIZE)
+        self.about_title_font = pygame.font.Font(str(FONT_PATH), 36)
+        self.about_body_font = pygame.font.Font(str(FONT_PATH), 26)
+        self.about_logo = load_about_logo()
+        self.about_canvas = None  # built once per BACK press -- see toggle_about()
 
         self.tracked_planes = {}  # hex -> planes.TrackedPlane
         self.flightlog = flightlog.FlightLog()
@@ -447,7 +505,11 @@ class JoanJettApp:
 
     def render(self):
         angle = self.sweep_angle()
-        self.update_planes(angle)
+        self.update_planes(angle)  # keeps tracking/logging flights even while ABOUT is up
+
+        if self.about_canvas is not None:
+            self.fb.write_surface(self.about_canvas)
+            return
 
         if self.current_screen == "aircraft":
             canvas = self._render_aircraft_screen(angle)
@@ -481,12 +543,39 @@ class JoanJettApp:
         idx = SCREENS.index(self.current_screen)
         self.current_screen = SCREENS[(idx + step) % len(SCREENS)]
 
+    def toggle_about(self):
+        """BACK (2026-09-22) -- shows/hides the fleet-wide ABOUT screen
+        instead of quitting. Every JOAN JET screen is a Left/Right
+        sibling, not a hierarchy, so they're all "home level" for this.
+        Built once per toggle -- nothing on it can change while it's up."""
+        if self.about_canvas is not None:
+            self.about_canvas = None
+            return
+        st = self.settings
+        canvas = pygame.Surface((FRAME_W, FRAME_H))
+        draw_about_screen(canvas, self.about_title_font, self.about_body_font, self.about_logo,
+                          f"JOAN JET {VERSION}", [
+                              ("LOCATION", st.location_name),
+                              ("LAT", f"{st.location_lat:.5f}"),
+                              ("LON", f"{st.location_lon:.5f}"),
+                              ("RANGE", f"{self.range_multiplier * 4} NM"),
+                              ("INTERVAL", f"{st.interval_sec:g} SEC"),
+                              ("COLORS", st.color_scheme),
+                          ])
+        self.about_canvas = canvas
+
     def handle_keycode(self, code):
-        """Returns True if the app should redraw, "quit"/"quit_home" to exit."""
+        """Returns True if the app should redraw, "quit"/"quit_home" to exit.
+        Back toggles ABOUT instead of quitting (2026-09-22); while it's
+        up, only Back/Home/Q/Esc/Menu do anything."""
         if code in (ecodes.KEY_HOMEPAGE, ecodes.KEY_HOME):
             return "quit_home"
-        elif code in (ecodes.KEY_Q, ecodes.KEY_ESC, ecodes.KEY_BACK, ecodes.KEY_COMPOSE):
+        elif code in (ecodes.KEY_Q, ecodes.KEY_ESC, ecodes.KEY_COMPOSE):
             return "quit"
+        elif code == ecodes.KEY_BACK:
+            self.toggle_about()
+        elif self.about_canvas is not None:
+            return False
         elif code == ecodes.KEY_UP:
             return self.change_range(1)
         elif code == ecodes.KEY_DOWN:
