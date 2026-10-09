@@ -7,11 +7,15 @@ Deliberately simple per user request 2026-09-11: no GPS track is kept,
 just the closest point of approach (date/time/altitude at minimum
 distance) plus callsign/type/squawk as they read at that same moment.
 """
+import contextlib
 import csv
 import datetime
+import fcntl
 import io
+import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import aircraft
@@ -20,6 +24,11 @@ LOG_RADIUS_NM = 9
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 LOCAL_LOG_PATH = SCRIPT_DIR / "data" / "flightlog.csv"
+# flock()'d around every append to and every rewrite of LOCAL_LOG_PATH --
+# the periodic background re-sync (see RESYNC_INTERVAL_SEC) rewrites the
+# local file from a separate process while this one may be appending a
+# freshly finalized pass to it at the same moment.
+LOCK_PATH = SCRIPT_DIR / "data" / "flightlog.lock"
 LOG_HEADER = ["date", "time", "callsign", "type", "altitude_ft", "squawk", "military"]
 # "Y"/"N" from readsb's dbFlags bit 0 (see aircraft.fetch_aircraft), or
 # "N/A" for any row logged before this column existed 2026-09-12 -- kept
@@ -67,6 +76,37 @@ REMOTE_PULL_KEY = SCRIPT_DIR / "flightlog_pull_key"
 # own closest-point-of-approach detection for one aircraft.
 DEDUP_WINDOW = datetime.timedelta(minutes=5)
 
+# How often a long-running host re-runs sync_and_merge() on its own, on
+# top of the once-at-launch sync. Added 2026-10-09 after production ran
+# solo for a week while MP was powered off: every fire-and-forget push
+# in that window was lost, and the launch-only backfill never ran again
+# because production never relaunched -- 9,204 rows only ever reached MP
+# by a manual sync. Re-syncing periodically means a host catches MP back
+# up (and picks up the other radio's rows for its own stats screens)
+# within one interval of MP coming back, no relaunch needed.
+RESYNC_INTERVAL_SEC = 15 * 60
+
+
+@contextlib.contextmanager
+def _local_log_lock():
+    """Exclusive flock on LOCK_PATH -- only ever held for the few ms it
+    takes to append one row or swap in a rewritten file, never across a
+    network call or the merge itself. Degrades to no locking (the
+    pre-2026-10-09 behavior) rather than failing the caller if the lock
+    file can't be opened."""
+    fd = None
+    try:
+        fd = os.open(LOCK_PATH, os.O_RDONLY | os.O_CREAT, 0o644)
+    except OSError as exc:
+        print(f"flightlog: lock unavailable, proceeding unlocked: {exc}", file=sys.stderr, flush=True)
+    try:
+        if fd is not None:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        if fd is not None:
+            os.close(fd)
+
 
 def _format_row(rec):
     alt = rec["alt_ft"]
@@ -86,6 +126,8 @@ class FlightLog:
     def __init__(self):
         self._in_progress = {}  # hex -> {callsign, category, min_dist_nm, alt_ft, squawk, time}
         self._pending_pushes = []  # Popen handles for fire-and-forget MP pushes, reaped opportunistically
+        self._resync_proc = None  # background sync_and_merge() process, see _maybe_resync
+        self._next_resync = time.monotonic() + RESYNC_INTERVAL_SEC  # launch sync already covered t=0
         LOCAL_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
         if not LOCAL_LOG_PATH.exists():
             with open(LOCAL_LOG_PATH, "w", newline="") as f:
@@ -120,6 +162,35 @@ class FlightLog:
         for hex_id in list(self._in_progress):
             if hex_id not in still_close:
                 self._finalize(hex_id)
+        self._maybe_resync()
+
+    def _maybe_resync(self):
+        """Every RESYNC_INTERVAL_SEC, runs sync_and_merge() in a separate,
+        niced python process -- not a thread: pulling and deduping the
+        whole multi-thousand-row archive is seconds of pure-Python CPU on
+        a Pi 3B+, which under the GIL would visibly stall the 20fps sweep.
+        A separate process lands on another core instead. Never starts a
+        second one while the previous is still running (e.g. MP slow to
+        answer); the stats screens pick up the rewritten file on their own
+        via their existing mtime check."""
+        if self._resync_proc is not None:
+            if self._resync_proc.poll() is None:
+                return
+            self._resync_proc = None
+        now = time.monotonic()
+        if now < self._next_resync:
+            return
+        self._next_resync = now + RESYNC_INTERVAL_SEC
+        if not REMOTE_PULL_KEY.exists():
+            return
+        try:
+            self._resync_proc = subprocess.Popen(
+                [sys.executable, "-c", "import flightlog; flightlog.sync_and_merge()"],
+                cwd=SCRIPT_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                preexec_fn=lambda: os.nice(10),
+            )
+        except OSError as exc:
+            print(f"flightlog: periodic re-sync failed to start: {exc}", file=sys.stderr, flush=True)
 
     def _finalize(self, hex_id):
         rec = self._in_progress.pop(hex_id)
@@ -128,8 +199,9 @@ class FlightLog:
         self._push_to_mp(row)
 
     def _write_local(self, row):
-        with open(LOCAL_LOG_PATH, "a", newline="") as f:
-            csv.writer(f).writerow(row)
+        with _local_log_lock():
+            with open(LOCAL_LOG_PATH, "a", newline="") as f:
+                csv.writer(f).writerow(row)
 
     def _push_to_mp(self, row):
         """Fire-and-forget: appends the same row to MP's copy over SSH
@@ -277,8 +349,9 @@ def _push_missing_rows_to_mp(missing_rows):
     killed mid-write by SIGTERM when the host is powered off (the
     fire-and-forget per-pass push in _push_to_mp has no retry and isn't
     waited on at shutdown). Safe to call with an empty list (no-op).
-    Blocking is fine here, unlike _push_to_mp -- this only runs once at
-    launch, not from the render loop, so there's no frame-pacing concern."""
+    Blocking is fine here, unlike _push_to_mp -- this only runs at launch
+    or in FlightLog's separate re-sync process, never from the render
+    loop, so there's no frame-pacing concern."""
     if not missing_rows:
         return True
     payload = "".join(",".join(str(row.get(col, "")) for col in LOG_HEADER) + "\n" for row in missing_rows)
@@ -334,7 +407,8 @@ def _fetch_remote_rows():
 
 def sync_and_merge():
     """Best-effort, called once at launch (main.py, before the app starts
-    reading LOCAL_LOG_PATH for its stats screens). Syncs in **both**
+    reading LOCAL_LOG_PATH for its stats screens) and then every
+    RESYNC_INTERVAL_SEC from a separate process (FlightLog._maybe_resync). Syncs in **both**
     directions every launch, per user request 2026-09-15 after production
     being powered off briefly (fan install) left it a few rows short of
     MP's canonical copy:
@@ -358,9 +432,16 @@ def sync_and_merge():
     if remote_rows is None:
         return
 
+    # Remember exactly how much of the local file this merge is based on,
+    # so any row appended while the (slow, unlocked) push/merge below runs
+    # can be carried over verbatim at swap time instead of being dropped.
+    read_offset = None
     try:
-        with open(LOCAL_LOG_PATH, newline="") as f:
-            local_rows = list(csv.DictReader(f))
+        with _local_log_lock():
+            with open(LOCAL_LOG_PATH, "rb") as f:
+                local_bytes = f.read()
+        read_offset = len(local_bytes)
+        local_rows = list(csv.DictReader(io.StringIO(local_bytes.decode("utf-8", errors="replace"), newline="")))
     except OSError:
         local_rows = []
 
@@ -383,6 +464,18 @@ def sync_and_merge():
         writer.writerow(LOG_HEADER)
         for row in merged:
             writer.writerow([row[col] for col in LOG_HEADER])
-    tmp_path.replace(LOCAL_LOG_PATH)  # atomic -- never leaves a half-written local log
+    with _local_log_lock():
+        if read_offset is not None:
+            try:
+                with open(LOCAL_LOG_PATH, "rb") as f:
+                    f.seek(read_offset)
+                    late_rows = f.read()
+            except OSError:
+                late_rows = b""
+            if late_rows:
+                # Not deduped this round -- the next sync folds them in.
+                with open(tmp_path, "ab") as f:
+                    f.write(late_rows)
+        tmp_path.replace(LOCAL_LOG_PATH)  # atomic -- never leaves a half-written local log
     print(f"flightlog: synced with MP -- {len(local_rows)} local + {len(remote_rows)} remote "
           f"-> {len(merged)} merged rows", flush=True)

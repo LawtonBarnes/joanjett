@@ -15,3 +15,4 @@ flightlog_known_hosts
 
 # Per-machine settings -- each host keeps its own; see settings.example.ini
 settings.ini
+data/flightlog.lock
