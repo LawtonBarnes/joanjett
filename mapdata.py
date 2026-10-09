@@ -11,6 +11,7 @@ import hashlib
 import json
 import math
 import os
+import sys
 
 import requests
 
@@ -136,10 +137,19 @@ def fetch_map_elements(lat, lon, radius_nm, use_cache=True):
     os.makedirs(CACHE_DIR, exist_ok=True)
     cache_file = _cache_path(lat, lon, radius_nm)
 
+    raw = None
     if use_cache and os.path.exists(cache_file):
-        with open(cache_file, "r") as f:
-            raw = json.load(f)
-    else:
+        # A cache file cut off mid-write (P4, 2026-08-31 -- the old
+        # non-atomic json.dump below, interrupted by the app being killed)
+        # used to crash the app on the next RANGE change onto that zoom
+        # level. Treat an unparsable one as a miss: drop it and refetch.
+        try:
+            with open(cache_file, "r") as f:
+                raw = json.load(f)
+        except ValueError as exc:
+            print(f"mapdata: discarding corrupt cache {cache_file}: {exc}", file=sys.stderr, flush=True)
+            os.remove(cache_file)
+    if raw is None:
         query = _build_query(lat, lon, radius_nm)
         resp = requests.post(
             OVERPASS_URL,
@@ -155,9 +165,16 @@ def fetch_map_elements(lat, lon, radius_nm, use_cache=True):
                 f"Overpass response was {len(content)} bytes (cap {MAX_RESPONSE_BYTES}) -- "
                 f"reduce radius_nm or narrow ROAD_HIGHWAY_TYPES before retrying"
             )
-        raw = json.loads(content)
-        with open(cache_file, "w") as f:
+        try:
+            raw = json.loads(content)
+        except ValueError as exc:
+            raise MapFetchError(f"Overpass returned unparsable JSON: {exc}") from exc
+        # Atomic -- a process killed mid-write leaves the old (or no)
+        # cache file, never a truncated one.
+        tmp_file = cache_file + ".tmp"
+        with open(tmp_file, "w") as f:
             json.dump(raw, f)
+        os.replace(tmp_file, cache_file)
 
     elements = []
     for el in raw.get("elements", []):
