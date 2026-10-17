@@ -107,6 +107,40 @@ fleet instead of standalone, skip steps 3/5 -- install alongside
 manual launcher/autologin. Note that only whichever puppet physically
 has the RTL-SDR dongle attached can actually run this usefully.
 
+## The background map
+
+The radar sits on a dark, all-blue street map of the area around your
+location. Map data (c) [OpenStreetMap](https://www.openstreetmap.org/copyright)
+contributors, available under the Open Database License.
+
+**Out of the box (any city):** the map comes straight from OpenStreetMap
+via the [Overpass API](https://overpass-api.de/), one download per RANGE
+step, cached in `cache/`. You get freeways, highways, rivers and large
+lakes. Nothing to set up -- this works for any `lat`/`lon` in
+`settings.ini`.
+
+**Detailed map (optional, recommended):** build a prebuilt basemap for
+your location once, and JOAN JET draws every RANGE from it with no
+downloads at all. It adds filled lakes, secondary and minor streets, rail
+lines, airport runways and taxiways, and county lines, each shown only at
+the ranges where it reads well.
+
+    python3 tools/build_basemap.py                    # uses settings.ini's location
+    python3 tools/build_basemap.py --lat 32.8348 --lon -96.6886
+
+It runs on a PC or a Pi (Python 3 standard library only, no extra
+packages) and writes `data/basemap_<lat>_<lon>.json.gz` -- about 1-2 MB for
+a big metro area. The download is ~30 small Overpass queries and can take
+anywhere from a few minutes to half an hour depending on how busy the
+public Overpass server is; raw responses are kept in `cache/basemap_raw/`
+so a rebuild is instant (`--refresh` re-downloads). Copy the output file
+into `data/` on each Pi that runs JOAN JET. The prebuilt map is used only
+when its location matches `settings.ini`; change the location and the app
+goes back to the live per-range download automatically.
+
+The repo ships with the basemap for the author's own location (METAL SHOP,
+Dallas TX) as an example.
+
 ## Architecture
 
 - `main.py` -- entry point: evdev input loop, FrameBuffer output,
@@ -114,7 +148,11 @@ has the RTL-SDR dongle attached can actually run this usefully.
 - `radar.py` -- the radar screen: rings, sweep line, vignette
 - `aircraft.py` -- reads and parses `/run/readsb/aircraft.json`
 - `aircraft_screen.py` -- the aircraft-list screen
-- `mapdata.py` / `maprender.py` -- background map rendering
+- `basemap.py` -- loads the prebuilt basemap for this location, or wraps
+  the live fetch's output in the same structure
+- `mapdata.py` -- live per-range Overpass fetch (the fallback map source)
+- `maprender.py` -- draws the map layers (pure blue, brightness by layer)
+- `tools/build_basemap.py` -- one-time detailed basemap builder
 - `planes.py` -- aircraft blip rendering on the radar screen
 - `geo.py` -- distance/bearing math (range/position relative to the
   receiver's own location)

@@ -38,6 +38,7 @@ import pygame  # noqa: E402
 import aircraft  # noqa: E402
 import aircraft_screen  # noqa: E402
 import airline_screen  # noqa: E402
+import basemap  # noqa: E402
 import category_screen  # noqa: E402
 import colors  # noqa: E402
 import compass  # noqa: E402
@@ -388,18 +389,25 @@ class JoanJettApp:
             self.show_loading()
         s = self.settings
         range_nm = self.range_multiplier * 4
-        try:
-            elements = mapdata.fetch_map_elements(
-                s.location_lat, s.location_lon, range_nm * FETCH_MARGIN
-            )
-        except (mapdata.MapFetchError, OSError) as exc:
-            print(f"Map fetch failed: {exc}", file=sys.stderr, flush=True)
-            self.error_message = f"MAP UNAVAILABLE AT {self.range_multiplier}X"
-            self.error_message_until = time.monotonic() + 3.0
-            return False
-        self.map_surface = maprender.render_map_surface(
-            elements, s.location_lat, s.location_lon, range_nm, s.color_scheme
-        )
+        # A prebuilt basemap for this exact location (tools/build_basemap.py)
+        # covers every RANGE with no download; anywhere else, the original
+        # live per-range Overpass fetch draws the basic map.
+        layers = None
+        prebuilt = basemap.find_prebuilt(s.location_lat, s.location_lon)
+        if prebuilt:
+            layers = basemap.load_prebuilt(prebuilt)
+        if layers is None:
+            try:
+                elements = mapdata.fetch_map_elements(
+                    s.location_lat, s.location_lon, range_nm * FETCH_MARGIN
+                )
+            except (mapdata.MapFetchError, OSError) as exc:
+                print(f"Map fetch failed: {exc}", file=sys.stderr, flush=True)
+                self.error_message = f"MAP UNAVAILABLE AT {self.range_multiplier}X"
+                self.error_message_until = time.monotonic() + 3.0
+                return False
+            layers = basemap.from_elements(elements, s.location_lat, s.location_lon)
+        self.map_surface = maprender.render_map_surface(layers, range_nm, s.color_scheme)
         radar_color = colors.rgb(colors.COLOR_SCHEMES[s.color_scheme]["RADAR"])
         map_color = colors.rgb(colors.COLOR_SCHEMES[s.color_scheme]["MAP_COLOR"])
         # background_surface is map+compass+ring NM labels -- the labels
