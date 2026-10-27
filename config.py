@@ -4,7 +4,7 @@ layer writes this same file back out, so it needs to stay easy to round-trip."""
 import configparser
 import os
 
-VERSION = "1.6"
+VERSION = "1.7"
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 SETTINGS_PATH = os.path.join(SCRIPT_DIR, "settings.ini")
@@ -64,3 +64,8 @@ class Settings:
         # tell the user what to tune the scanner to.
         self.atc_icao = cp.get("atc", "icao", fallback="KDAL")
         self.atc_freq = cp.get("atc", "freq", fallback="118.70")
+
+        # AIR METAL's ride (2026-10-27): the aircraft the 2x2 wall on
+        # PRODUCTION is riding gets a yellow circle on the radar. Empty
+        # turns it off.
+        self.airmetal_url = cp.get("airmetal", "url", fallback="http://192.168.68.71:8430/riding")

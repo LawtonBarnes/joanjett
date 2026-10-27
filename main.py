@@ -38,6 +38,7 @@ import pygame  # noqa: E402
 import aircraft  # noqa: E402
 import aircraft_screen  # noqa: E402
 import airline_screen  # noqa: E402
+import airmetal_link  # noqa: E402
 import basemap  # noqa: E402
 import category_screen  # noqa: E402
 import colors  # noqa: E402
@@ -296,6 +297,7 @@ class JoanJettApp:
         self.about_canvas = None  # built once per BACK press -- see toggle_about()
 
         self.tracked_planes = {}  # hex -> planes.TrackedPlane
+        self.airmetal = airmetal_link.AirMetalLink(self.settings.airmetal_url)
         self.flightlog = flightlog.FlightLog()
         self._prev_sweep_angle = 0.0
         self._latest_aircraft = []
@@ -453,6 +455,7 @@ class JoanJettApp:
         planes_layer = planes.render_planes(
             self.tracked_planes, self.settings.location_lat, self.settings.location_lon,
             range_nm, self._plane_color, self.callsign_font, (FRAME_W, FRAME_H),
+            ride_hex=self.airmetal.riding_hex,
         )
         canvas.blit(planes_layer, (0, 0))
 

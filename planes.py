@@ -30,6 +30,13 @@ CALLSIGN_BOX_PAD_Y = 2
 # arrowhead fully solid before the fade starts (per user request 2026-08-25).
 TRAIL_FULL_OPACITY_SEGMENTS = 2
 
+# AIR METAL's ride (see airmetal_link.py): a yellow circle around its
+# arrowhead, drawn under the arrowhead itself. An ellipse in the framebuffer
+# -- height scaled by PIXEL_ASPECT_RATIO -- so it's round on the CRT.
+RIDE_RING_RADIUS = 15
+RIDE_RING_WIDTH = 2
+RIDE_LABEL_GAP = 3  # its callsign box moves out to clear the ring
+
 
 def _heading_unit_vector(heading_deg):
     import math
@@ -110,25 +117,25 @@ def _draw_faded_trail(layer, px_points, color, width):
         pygame.draw.line(layer, (r, g, b, alpha), px_points[j], px_points[j + 1], width)
 
 
-def render_planes(tracked, center_lat, center_lon, range_nm, plane_color, font, size):
+def render_planes(tracked, center_lat, center_lon, range_nm, plane_color, font, size, ride_hex=None):
     layer = pygame.Surface(size, pygame.SRCALPHA)
 
     plane_data = []
-    for plane in tracked.values():
+    for hex_id, plane in tracked.items():
         if not plane.has_position:
             continue
         px_points = [
             geo.latlon_to_px(lat, lon, center_lat, center_lon, range_nm, config.CENTER_PX, config.OUTER_RADIUS_PX)
             for lat, lon in plane.trail
         ]
-        plane_data.append((plane, px_points))
+        plane_data.append((hex_id, plane, px_points))
 
     # Callsign boxes drawn first, trail+arrowhead drawn after (on top) --
     # per user request 2026-08-25, so an overlapping black box never punches
     # a gap into the trail/arrowhead line.
     helicopter_color = colors.rgb(colors.MAGENTA)
 
-    for plane, px_points in plane_data:
+    for hex_id, plane, px_points in plane_data:
         if plane.callsign:
             pos = px_points[-1]
             label_color = helicopter_color if plane.is_helicopter else plane_color
@@ -138,13 +145,20 @@ def render_planes(tracked, center_lat, center_lon, range_nm, plane_color, font, 
             )
             box.fill(colors.rgb(colors.BLACK))
             box.blit(text, (CALLSIGN_BOX_PAD_X, CALLSIGN_BOX_PAD_Y))
-            layer.blit(box, (pos[0] + ARROWHEAD_WIDTH, pos[1] - box.get_height() / 2))
+            box_dx = RIDE_RING_RADIUS + RIDE_LABEL_GAP if hex_id == ride_hex else ARROWHEAD_WIDTH
+            layer.blit(box, (pos[0] + box_dx, pos[1] - box.get_height() / 2))
 
-    for plane, px_points in plane_data:
+    ride_color = colors.rgb(colors.YELLOW)
+    for hex_id, plane, px_points in plane_data:
         trail_color = helicopter_color if plane.is_helicopter else plane_color
         _draw_faded_trail(layer, px_points, trail_color, TRAIL_WIDTH)
 
         pos = px_points[-1]
+        if hex_id == ride_hex:
+            ring_h = RIDE_RING_RADIUS * config.PIXEL_ASPECT_RATIO
+            ring = pygame.Rect(0, 0, RIDE_RING_RADIUS * 2, round(ring_h * 2))
+            ring.center = (round(pos[0]), round(pos[1]))
+            pygame.draw.ellipse(layer, ride_color, ring, RIDE_RING_WIDTH)
         dx, dy = _heading_unit_vector(plane.heading_deg)
         tip = (pos[0] + dx * ARROWHEAD_LENGTH / 2, pos[1] + dy * ARROWHEAD_LENGTH / 2)
         base_center = (pos[0] - dx * ARROWHEAD_LENGTH / 2, pos[1] - dy * ARROWHEAD_LENGTH / 2)

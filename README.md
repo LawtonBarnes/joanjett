@@ -154,6 +154,8 @@ Dallas TX) as an example.
 - `maprender.py` -- draws the map layers (pure blue, brightness by layer)
 - `tools/build_basemap.py` -- one-time detailed basemap builder
 - `planes.py` -- aircraft blip rendering on the radar screen
+- `airmetal_link.py` -- polls AIR METAL (the 2x2 CRT wall) for the
+  aircraft it's riding, which the radar circles in yellow
 - `geo.py` -- distance/bearing math (range/position relative to the
   receiver's own location)
 - `compass.py` -- compass rose rendering
