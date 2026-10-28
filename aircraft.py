@@ -86,8 +86,15 @@ def fetch_aircraft(center_lat, center_lon, max_tracked):
                 # bit 0 of readsb's dbFlags is the common military-aircraft
                 # convention; absent entirely on most contacts (civil, or
                 # readsb builds without a military DB loaded), so this is a
-                # best-effort count, not authoritative.
+                # best-effort count, not authoritative. Needs readsb's
+                # --db-file (tar1090-db aircraft.csv.gz) -- without it
+                # dbFlags is never emitted at all (P4 ran that way until
+                # 2026-10-27, so every pass logged before then reads N).
                 "military": bool(ac.get("dbFlags", 0) & 1),
+                # ICAO type designator from the same --db-file database
+                # (e.g. "T38", "C17", "B738"), None when readsb has no
+                # database entry for this hex.
+                "model": (ac.get("t") or "").strip() or None,
             }
         )
     aircraft.sort(key=lambda a: a["dist_nm"])

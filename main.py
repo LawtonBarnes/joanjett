@@ -48,6 +48,7 @@ import flightlog  # noqa: E402
 import info  # noqa: E402
 import mapdata  # noqa: E402
 import maprender  # noqa: E402
+import military_screen  # noqa: E402
 import planes  # noqa: E402
 import radar  # noqa: E402
 
@@ -75,10 +76,12 @@ FRAME_INTERVAL = 1.0 / 20  # 20fps -- plenty smooth for a slow-rotating sweep,
 # screens per user request ("I like the tables better than the pie
 # charts") -- two airline breakdowns (cross-referenced against the
 # 123atc.com callsign/country lookup table) plus a category legend
-# (cross-referenced against aircraft.CATEGORY_LABELS).
+# (cross-referenced against aircraft.CATEGORY_LABELS). MILITARY FLIGHTS
+# added 2026-10-27, once readsb's aircraft database made the military flag
+# real.
 SCREENS = [
     "radar", "aircraft", "category",
-    "airline_intl", "airline_domestic",
+    "airline_intl", "airline_domestic", "military",
 ]
 
 # See bars.py -- Home exits with this so a future menu/STRINGS integration
@@ -514,6 +517,16 @@ class JoanJettApp:
         canvas.blit(airline_layer, (0, 0))
         return canvas
 
+    def _render_military_screen(self):
+        # Same plain-map/no-radar-layers treatment as Category/Airline above.
+        canvas = self.map_surface.copy()
+        canvas.blit(self.vignette_surface, (0, 0))
+        military_layer = military_screen.render_military_screen(
+            (FRAME_W, FRAME_H), self.settings.color_scheme, self.aircraft_screen_font,
+        )
+        canvas.blit(military_layer, (0, 0))
+        return canvas
+
     def render(self):
         angle = self.sweep_angle()
         self.update_planes(angle)  # keeps tracking/logging flights even while ABOUT is up
@@ -528,6 +541,8 @@ class JoanJettApp:
             canvas = self._render_category_screen()
         elif self.current_screen in ("airline_intl", "airline_domestic"):
             canvas = self._render_airline_screen(self.current_screen)
+        elif self.current_screen == "military":
+            canvas = self._render_military_screen()
         else:
             canvas = self._render_radar_screen(angle)
 

@@ -29,14 +29,21 @@ LOCAL_LOG_PATH = SCRIPT_DIR / "data" / "flightlog.csv"
 # local file from a separate process while this one may be appending a
 # freshly finalized pass to it at the same moment.
 LOCK_PATH = SCRIPT_DIR / "data" / "flightlog.lock"
-LOG_HEADER = ["date", "time", "callsign", "type", "altitude_ft", "squawk", "military"]
-# "Y"/"N" from readsb's dbFlags bit 0 (see aircraft.fetch_aircraft), or
+LOG_HEADER = ["date", "time", "callsign", "type", "altitude_ft", "squawk", "military", "model"]
+# military: "Y"/"N" from readsb's dbFlags bit 0 (see aircraft.fetch_aircraft), or
 # "N/A" for any row logged before this column existed 2026-09-12 -- kept
 # distinct from "N" so old rows read as "not measured", not "measured and
 # not military". Bit 0 is the only military-adjacent signal readsb
 # exposes; there's no separate "government (non-military)" flag to also
 # capture here, so a Coast Guard/FAA-type aircraft with no military
 # ICAO-address flag won't be caught by this column.
+# model: ICAO type designator ("T38", "B738", ...) from readsb's aircraft
+# database, added 2026-10-27 for the MILITARY FLIGHTS screen. "N/A" for
+# rows logged before then, and for any aircraft the database doesn't know.
+# Same no-commas-in-values assumption as every other column -- the MP
+# pushes below join with a bare "," (type designators never contain one).
+# Note: every military row before 2026-10-27 reads N, not N/A -- readsb
+# wasn't loading its database until then, so the flag was never set.
 
 # Dedicated key, authorized on MP with a forced command
 # ("cat >> .../joanjett_flightlog.csv") restricted to appending to that
@@ -119,6 +126,7 @@ def _format_row(rec):
         str(alt) if alt is not None else "N/A",
         str(squawk) if squawk else "N/A",
         "Y" if rec["military"] else "N",
+        rec["model"] or "N/A",
     ]
 
 
@@ -152,6 +160,7 @@ class FlightLog:
                     "alt_ft": ac.get("alt_baro"),
                     "squawk": ac.get("squawk"),
                     "military": ac.get("military", False),
+                    "model": ac.get("model"),
                     "time": now,
                 }
         # A pass finalizes the instant its aircraft is no longer within
@@ -264,9 +273,11 @@ def _normalize_military(row):
     csv.DictReader as '' or None rather than 'Y'/'N'/'N/A'. Never let
     that reach the rewritten CSV as a raw empty field: treat it the same
     as a genuinely pre-migration row (data was never captured for it),
-    not as a false 'N'."""
-    if not row.get("military"):
-        row["military"] = "N/A"
+    not as a false 'N'. Same for 'model' (added 2026-10-27, same
+    migration-window risk)."""
+    for col in ("military", "model"):
+        if not row.get(col):
+            row[col] = "N/A"
     return row
 
 
