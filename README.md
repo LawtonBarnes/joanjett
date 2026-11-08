@@ -1,5 +1,7 @@
 # JOAN JET (`joanjett`)
 
+> **Standalone:** runs on a single Raspberry Pi with an RTL-SDR dongle and readsb on the same Pi. The fleet extras (flight-log sync to MP, the AIR METAL link) are optional and fail quietly when absent.
+
 A retro CRT ADS-B flight radar for a Raspberry Pi -- a sweeping radar
 display showing live aircraft in range, driven by a cheap RTL-SDR USB
 dongle.
