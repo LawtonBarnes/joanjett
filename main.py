@@ -302,6 +302,7 @@ class JoanJettApp:
         self.tracked_planes = {}  # hex -> planes.TrackedPlane
         self.airmetal = airmetal_link.AirMetalLink(self.settings.airmetal_url)
         self.flightlog = flightlog.FlightLog()
+        self.feed = aircraft.Feed(self.settings.feed_file, self.settings.feed_url)
         self._prev_sweep_angle = 0.0
         self._latest_aircraft = []
         self._aircraft_fetch_ok = False
@@ -437,10 +438,14 @@ class JoanJettApp:
 
     def update_planes(self, current_angle):
         s = self.settings
-        live = aircraft.fetch_aircraft(s.location_lat, s.location_lon, s.max_tracked)
+        live = aircraft.fetch_aircraft(self.feed, s.location_lat, s.location_lon, s.max_tracked)
         self._aircraft_fetch_ok = live is not None
         self._latest_aircraft = live or []
-        self.flightlog.update(self._latest_aircraft)
+        # Only the copy on the receiver itself logs passes (2026-11-25):
+        # every other screen sees the same aircraft over the network, and
+        # logging them too would count each pass once per screen. An empty
+        # update still runs the periodic re-sync, for the stats screens.
+        self.flightlog.update(self._latest_aircraft if self.feed.source == "local" else [])
         planes.update_tracked(
             self.tracked_planes, self._latest_aircraft, self._prev_sweep_angle, current_angle, s.trail_length
         )
@@ -587,8 +592,16 @@ class JoanJettApp:
                               ("RANGE", f"{self.range_multiplier * 4} NM"),
                               ("INTERVAL", f"{st.interval_sec:g} SEC"),
                               ("COLORS", st.color_scheme),
+                              ("FEED", self._feed_label()),
                           ])
         self.about_canvas = canvas
+
+    def _feed_label(self):
+        if self.feed.source == "local":
+            return "LOCAL RECEIVER"
+        if self.feed.source == "network":
+            return "READSB " + self.settings.feed_url.split("//", 1)[-1].split("/", 1)[0]
+        return "NO DATA"
 
     def handle_keycode(self, code):
         """Returns True if the app should redraw, "quit"/"quit_home" to exit.

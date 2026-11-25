@@ -37,6 +37,15 @@ dongle, decodes ADS-B messages, and writes live aircraft state to
 (`systemctl status readsb`, and whether `/run/readsb/aircraft.json` is
 actually being updated) before assuming a bug in this app.
 
+**No receiver on this Pi?** JOAN JET then reads the receiver's file over
+the network instead: `[feed] url` in `settings.ini`, by default P4's
+tar1090 (`http://192.168.68.70/tar1090/data/aircraft.json`), polled once
+a second on a background thread. That's how one SDR serves every screen
+in the fleet (2026-11-25). Only a copy reading readsb's local file logs
+passes to the flight log, so a pass is never counted once per screen;
+the others still show the merged log on their stats screens if they have
+a pull key (see `flightlog.py`). ABOUT's FEED row says which it's using.
+
 ## Screens
 
 Cycled with `←`/`→`:
@@ -148,7 +157,8 @@ Dallas TX) as an example.
 - `main.py` -- entry point: evdev input loop, FrameBuffer output,
   screen cycling, the continuous sweep-animation render loop
 - `radar.py` -- the radar screen: rings, sweep line, vignette
-- `aircraft.py` -- reads and parses `/run/readsb/aircraft.json`
+- `aircraft.py` -- reads and parses `/run/readsb/aircraft.json`, or
+  the receiver's copy over HTTP when this Pi has none
 - `aircraft_screen.py` -- the aircraft-list screen
 - `basemap.py` -- loads the prebuilt basemap for this location, or wraps
   the live fetch's output in the same structure

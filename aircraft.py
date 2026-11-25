@@ -1,6 +1,12 @@
-"""Fetches current aircraft state from readsb. Runs directly on the same Pi
-as the SDR dongle/readsb (production, per project convention), so this
-reads readsb's own JSON file locally rather than over HTTP.
+"""Fetches current aircraft state from readsb.
+
+On the Pi with the SDR dongle (P4) it reads readsb's own JSON file. Any
+other screen in the fleet reads the same file from P4 over HTTP (tar1090's
+lighttpd, the feed AIR METAL and EXITROW use), on a background thread so
+the sweep never waits on the network (2026-11-25: one shared receiver,
+JOAN JET on any tube). Which one this frame came from decides whether
+this copy logs passes -- only the receiver's own copy does, so the
+shared flight log never counts a pass twice (see main.update_planes).
 
 Distance/bearing are computed here from each aircraft's lat/lon against
 JOAN JETT's own LOCATION setting -- deliberately not readsb's r_dst/r_dir,
@@ -8,10 +14,17 @@ which are relative to *readsb's* internal site-position config and could
 drift out of sync with this app's own settings.
 """
 import json
+import os
+import threading
+import time
+import urllib.request
 
 import geo
 
-AIRCRAFT_JSON_PATH = "/run/readsb/aircraft.json"
+AIRCRAFT_JSON_PATH = "/run/readsb/aircraft.json"  # default; settings.ini [feed] file
+LOCAL_FRESH_SEC = 10.0  # readsb rewrites its file every second; older = no receiver here
+NETWORK_POLL_SEC = 1.0
+NETWORK_STALE_SEC = 15.0  # no good answer from the network feed this long: no data
 
 # Fallback callsign for a contact with no broadcast "flight" field -- shared
 # with flightlog.py, which needs to recognize this exact value: it's not a
@@ -40,15 +53,59 @@ def format_category(category):
     return CATEGORY_LABELS.get(category, "UNKNOWN")
 
 
-def fetch_aircraft(center_lat, center_lon, max_tracked):
+class Feed:
+    """Where aircraft come from: readsb's local file when it's being kept
+    fresh (this Pi has the receiver), otherwise `url` -- the receiver's
+    file served over HTTP -- polled on a background thread. `source` says
+    which the last read() used: "local", "network" or None (no data)."""
+
+    def __init__(self, path=AIRCRAFT_JSON_PATH, url=""):
+        self.path, self.url = path, url
+        self.source = None
+        self._net = None  # (raw, time received)
+        self._net_started = False
+
+    def _local(self):
+        try:
+            if time.time() - os.path.getmtime(self.path) > LOCAL_FRESH_SEC:
+                return None
+            with open(self.path) as f:
+                return json.load(f)
+        except (OSError, json.JSONDecodeError):
+            return None
+
+    def _poll(self):
+        while True:
+            try:
+                with urllib.request.urlopen(self.url, timeout=3) as resp:
+                    self._net = (json.load(resp), time.time())
+            except (OSError, ValueError):
+                pass
+            time.sleep(NETWORK_POLL_SEC)
+
+    def read(self):
+        raw = self._local()
+        if raw is not None:
+            self.source = "local"
+            return raw
+        if self.url and not self._net_started:
+            self._net_started = True
+            threading.Thread(target=self._poll, daemon=True).start()
+        net = self._net
+        if net is not None and time.time() - net[1] < NETWORK_STALE_SEC:
+            self.source = "network"
+            return net[0]
+        self.source = None
+        return None
+
+
+def fetch_aircraft(feed, center_lat, center_lon, max_tracked):
     """-> up to max_tracked aircraft dicts, nearest first, or None on a
     read/parse failure -- distinct from an empty list, which means the
     fetch worked but the sky is genuinely quiet (used for the Info HUD's
-    STATUS readout)."""
-    try:
-        with open(AIRCRAFT_JSON_PATH) as f:
-            raw = json.load(f)
-    except (OSError, json.JSONDecodeError):
+    STATUS readout). `feed`: a Feed."""
+    raw = feed.read()
+    if raw is None:
         return None
 
     aircraft = []
