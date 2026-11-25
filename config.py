@@ -76,3 +76,9 @@ class Settings:
         # local file logs passes.
         self.feed_file = cp.get("feed", "file", fallback="/run/readsb/aircraft.json")
         self.feed_url = cp.get("feed", "url", fallback="http://192.168.68.70/tar1090/data/aircraft.json")
+
+        # Who logs passes: "app" (this screen, while JOAN JET is showing --
+        # a single Pi on its own) or "service" (logger.py's background
+        # service on the receiver, so passes are logged whatever's on screen;
+        # the app then never logs).
+        self.logged_by = cp.get("flightlog", "logged_by", fallback="app").strip().lower()

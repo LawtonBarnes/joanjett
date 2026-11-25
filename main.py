@@ -445,7 +445,8 @@ class JoanJettApp:
         # every other screen sees the same aircraft over the network, and
         # logging them too would count each pass once per screen. An empty
         # update still runs the periodic re-sync, for the stats screens.
-        self.flightlog.update(self._latest_aircraft if self.feed.source == "local" else [])
+        logs_here = self.feed.source == "local" and self.settings.logged_by != "service"
+        self.flightlog.update(self._latest_aircraft if logs_here else [])
         planes.update_tracked(
             self.tracked_planes, self._latest_aircraft, self._prev_sweep_angle, current_angle, s.trail_length
         )

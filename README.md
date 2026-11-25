@@ -46,6 +46,11 @@ passes to the flight log, so a pass is never counted once per screen;
 the others still show the merged log on their stats screens if they have
 a pull key (see `flightlog.py`). ABOUT's FEED row says which it's using.
 
+**Logging whatever's on screen:** on the receiver, `logger.py` can run as
+its own service (`joanjett-logger.service`, install steps at its top) with
+`[flightlog] logged_by = service`, so passes are logged even while that
+tube shows another app. The fleet's P4 runs it this way.
+
 ## Screens
 
 Cycled with `←`/`→`:

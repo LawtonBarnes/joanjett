@@ -1,0 +1,21 @@
+# JOAN JET's flight logger (logger.py) -- on the Pi with the receiver only.
+#   sudo install -m 644 /opt/joanjett/joanjett-logger.service /etc/systemd/system/
+#   sudo systemctl enable --now joanjett-logger
+# and `[flightlog] logged_by = service` in /opt/joanjett/settings.ini.
+# Runs as root, like the app (its launcher goes through sudo openvt), so
+# both can write data/flightlog.csv.
+[Unit]
+Description=JOAN JET flight logger
+After=readsb.service network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/opt/joanjett
+ExecStart=/usr/bin/python3 /opt/joanjett/logger.py
+Restart=always
+RestartSec=10
+Nice=10
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target
