@@ -445,8 +445,14 @@ class JoanJettApp:
         # every other screen sees the same aircraft over the network, and
         # logging them too would count each pass once per screen. An empty
         # update still runs the periodic re-sync, for the stats screens.
-        logs_here = self.feed.source == "local" and self.settings.logged_by != "service"
-        self.flightlog.update(self._latest_aircraft if logs_here else [])
+        # With the logger service (logged_by = service) this copy does
+        # nothing for the log at all: the service logs, and its periodic
+        # re-sync keeps this Pi's local copy merged for the stats screens.
+        # A second re-sync here was ~83 MB and ~27 s of a core on a Pi 3B+
+        # every 15 min for nothing (2026-11-25).
+        if self.settings.logged_by != "service":
+            logs_here = self.feed.source == "local"
+            self.flightlog.update(self._latest_aircraft if logs_here else [])
         planes.update_tracked(
             self.tracked_planes, self._latest_aircraft, self._prev_sweep_angle, current_angle, s.trail_length
         )
