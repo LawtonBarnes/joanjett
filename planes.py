@@ -18,12 +18,12 @@ import colors
 import config
 import geo
 
-ARROWHEAD_WIDTH = 10
-ARROWHEAD_LENGTH = 20
-TRAIL_WIDTH = 3
-CALLSIGN_FONT_SIZE = 20  # bumped from 18 (2026-08-25, "a tiny bit")
-CALLSIGN_BOX_PAD_X = 4
-CALLSIGN_BOX_PAD_Y = 2
+ARROWHEAD_WIDTH = config.px(10)
+ARROWHEAD_LENGTH = config.px(20)
+TRAIL_WIDTH = config.lw(3)
+CALLSIGN_FONT_SIZE = config.px(20)  # bumped from 18 (2026-08-25, "a tiny bit")
+CALLSIGN_BOX_PAD_X = config.px(4)
+CALLSIGN_BOX_PAD_Y = config.px(2)
 
 # Trail fade -- opaque near the current position, transparent toward the
 # oldest end. TRAIL_FULL_OPACITY_SEGMENTS keeps the segments closest to the
@@ -33,9 +33,9 @@ TRAIL_FULL_OPACITY_SEGMENTS = 2
 # AIR METAL's ride (see airmetal_link.py): a yellow circle around its
 # arrowhead, drawn under the arrowhead itself. An ellipse in the framebuffer
 # -- height scaled by PIXEL_ASPECT_RATIO -- so it's round on the CRT.
-RIDE_RING_RADIUS = 15
-RIDE_RING_WIDTH = 2
-RIDE_LABEL_GAP = 3  # its callsign box moves out to clear the ring
+RIDE_RING_RADIUS = config.px(15)
+RIDE_RING_WIDTH = config.lw(2)
+RIDE_LABEL_GAP = config.px(3)  # its callsign box moves out to clear the ring
 
 
 def _heading_unit_vector(heading_deg):

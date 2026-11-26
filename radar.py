@@ -17,11 +17,11 @@ RING_ANGLE_STEP_DEG = 2  # point density for the ring polyline -- fine enough
 GAP_CENTER_DEG = 90  # east / screen-right -- spec's "small gap on the right
 # side for the distance indicator"
 GAP_HALF_ANGLE_DEG = 12
-RING_WIDTH = 2  # 2px minimum per user request 2026-08-25 (was dotted, 1px dots)
+RING_WIDTH = config.lw(2)  # 2px minimum per user request 2026-08-25 (was dotted, 1px dots)
 
-RING_LABEL_FONT_SIZE = 22  # bumped from 18 (2026-08-25, "not much" per user)
-RING_LABEL_BOX_PAD_X = 4
-RING_LABEL_BOX_PAD_Y = 2
+RING_LABEL_FONT_SIZE = config.px(22)  # bumped from 18 (2026-08-25, "not much" per user)
+RING_LABEL_BOX_PAD_X = config.px(4)
+RING_LABEL_BOX_PAD_Y = config.px(2)
 
 # Trailing gradient behind the sweep head -- spec: "triangular, wider at the
 # outer radius, 1 pixel at the vertex." A fixed *angular* width naturally
@@ -47,8 +47,8 @@ TRAIL_LINE_COUNT = 50  # bumped from 40 (2026-08-25) -- at 40 the outer gap
 # was ~2.08px, right at the 2px line width edge (still faintly visible);
 # 50 brings it to ~1.66px for a comfortable overlap margin
 TRAIL_ANGLE_STEP_DEG = TRAIL_SWEEP_DEG / TRAIL_LINE_COUNT
-TRAIL_LINE_WIDTH = 2  # 2px minimum per user request 2026-08-25 (was 1px)
-SWEEP_HEAD_WIDTH = 2
+TRAIL_LINE_WIDTH = config.lw(2)  # 2px minimum per user request 2026-08-25 (was 1px)
+SWEEP_HEAD_WIDTH = config.lw(2)
 
 
 def _polar_to_px(radius_px, angle_deg, center_px=config.CENTER_PX):

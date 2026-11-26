@@ -12,10 +12,10 @@ import colors
 import config
 import geo
 
-FONT_SIZE = 22  # spec: "Font Size: 22 point"
-LINE_HEIGHT = 24  # spec: "22 point Leading" -- line-to-line spacing close to the font size itself
-BOX_PAD_X = 4
-BOX_PAD_Y = 2
+FONT_SIZE = config.px(22)  # spec: "Font Size: 22 point"
+LINE_HEIGHT = config.px(24)  # spec: "22 point Leading" -- line-to-line spacing close to the font size itself
+BOX_PAD_X = config.px(4)
+BOX_PAD_Y = config.px(2)
 BOX_ALPHA = 64  # 25% opacity (2026-08-25, was 128/50%) -- Info HUD only,
 # unlike the fully-opaque boxes behind compass/callsign/ring labels
 

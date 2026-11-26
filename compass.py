@@ -18,8 +18,8 @@ CARDINALS = (("N", 0), ("E", 90), ("S", 180), ("W", 270))
 # NM label and was hard to read at the original font size).
 RADIUS_FRACTION = 0.375
 
-BOX_PAD_X = 6
-BOX_PAD_Y = 3
+BOX_PAD_X = config.px(6)
+BOX_PAD_Y = config.px(3)
 
 
 def draw_compass(surface, map_color, font):

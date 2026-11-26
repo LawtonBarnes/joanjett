@@ -103,10 +103,11 @@ FETCH_MARGIN = 1.3  # covers screen corners at ~1.27x range, see geo.py
 # middle, METAL SHOP logo bottom center. The logo is square-pixel art, so
 # it's stretched horizontally by 720/640 to look right on the CRT's
 # narrower-than-square 720x480 pixels.
-ABOUT_MARGIN_Y = 48  # keeps title/logo inside the CRT's visible area
-ABOUT_LINE_GAP = 8
-ABOUT_COLUMN_GAP = 16
-LOGO_X_STRETCH = 720 / 640
+ABOUT_MARGIN_Y = config.px(48)  # keeps title/logo inside the CRT's visible area
+ABOUT_LINE_GAP = config.px(8)
+ABOUT_COLUMN_GAP = config.px(16)
+LOGO_X_STRETCH = 1.0 if config.HD else 720 / 640  # HD pixels are square;
+# the logo shows at its native size there, like every HD splash
 
 
 def load_about_logo():
@@ -178,7 +179,7 @@ class FrameBuffer:
 
     def write_surface(self, surface):
         if surface.get_size() != (self.width, self.height):
-            surface = pygame.transform.scale(surface, (self.width, self.height))
+            surface = self._fit(surface)
         arr = pygame.surfarray.pixels3d(surface).transpose(1, 0, 2)
         if self.bpp == 16:
             r = arr[:, :, 0].astype(np.uint16) >> 3
@@ -197,15 +198,27 @@ class FrameBuffer:
                 self.mm.seek(y * self.stride)
                 self.mm.write(raw[y * self.row_bytes : (y + 1) * self.row_bytes])
 
+    def _fit(self, surface):
+        """SD frame on a framebuffer of another size. On a 16:9 one
+        (HIDEF with display = sd) it's pillarboxed 4:3 with black bars --
+        never stretched. Otherwise (a 4:3 HDMI mode) scaled to fill."""
+        if self.width / self.height < 1.6:
+            return pygame.transform.scale(surface, (self.width, self.height))
+        pic_w = round(self.height * 4 / 3)
+        out = pygame.Surface((self.width, self.height))
+        out.fill(BLACK)
+        out.blit(pygame.transform.smoothscale(surface, (pic_w, self.height)), ((self.width - pic_w) // 2, 0))
+        return out
+
     def close(self):
         self.mm.close()
         os.close(self.fd)
 
 
-SPLASH_IMAGE_OFFSET_Y = -40  # shifts the splash art up from dead-center to
+SPLASH_IMAGE_OFFSET_Y = -config.px(40)  # shifts the splash art up from dead-center to
 # leave room for the VERSION/LOADING text underneath it
-SPLASH_TEXT_GAP = 12  # below the image, before the first text line
-SPLASH_LINE_GAP = 4  # between the two text lines
+SPLASH_TEXT_GAP = config.px(12)  # below the image, before the first text line
+SPLASH_LINE_GAP = config.px(4)  # between the two text lines
 
 
 def build_splash_base(font, version_text):
@@ -282,20 +295,20 @@ class JoanJettApp:
 
         self.settings = config.Settings()
         self.range_multiplier = self.settings.range_multiplier
-        self.status_font = pygame.font.Font(str(FONT_PATH), 24)
+        self.status_font = pygame.font.Font(str(FONT_PATH), config.px(24))
         self.ring_label_font = pygame.font.Font(str(FONT_PATH), radar.RING_LABEL_FONT_SIZE)
         # Fixed at 36, not derived from RING_LABEL_FONT_SIZE*2 -- that used
         # to double as "compass is 2x the ring-label size," but bumping the
         # ring-label size later (2026-08-25) shouldn't silently drag the
         # already-tuned/approved compass size along with it.
-        self.compass_font = pygame.font.Font(str(FONT_PATH), 36)
+        self.compass_font = pygame.font.Font(str(FONT_PATH), config.px(36))
         # Bold (synthetic, via set_bold -- no dedicated bold VCR OSD Mono
         # file exists on this Pi) was added 2026-08-25, then removed again
         # same day per follow-up user request.
         self.callsign_font = pygame.font.Font(str(FONT_PATH), planes.CALLSIGN_FONT_SIZE)
         self.info_font = pygame.font.Font(str(FONT_PATH), info.FONT_SIZE)
-        self.about_title_font = pygame.font.Font(str(FONT_PATH), 36)
-        self.about_body_font = pygame.font.Font(str(FONT_PATH), 26)
+        self.about_title_font = pygame.font.Font(str(FONT_PATH), config.px(36))
+        self.about_body_font = pygame.font.Font(str(FONT_PATH), config.px(26))
         self.about_logo = load_about_logo()
         self.about_canvas = None  # built once per BACK press -- see toggle_about()
 
@@ -560,7 +573,7 @@ class JoanJettApp:
 
         if self.error_message and time.monotonic() < self.error_message_until:
             text = self.status_font.render(self.error_message, True, WHITE, (128, 0, 0))
-            canvas.blit(text, ((FRAME_W - text.get_width()) // 2, FRAME_H - 40))
+            canvas.blit(text, ((FRAME_W - text.get_width()) // 2, FRAME_H - config.px(40)))
         self.fb.write_surface(canvas)
 
     def change_range(self, step):

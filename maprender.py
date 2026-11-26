@@ -49,7 +49,28 @@ STYLES = {
 FAR_RANGE = 12
 
 # Smallest lake drawn, as its on-screen span in pixels at the current range.
-MIN_LAKE_PX = 4
+MIN_LAKE_PX = config.px(4)
+
+
+
+def _scale_style(style):
+    """SD line widths/dash lengths at this display's scale (HD, see
+    config.py) -- the far-range override dict too."""
+    out = dict(style)
+    for k in ("width", "glow_width"):
+        if k in out:
+            out[k] = config.lw(out[k])
+    if "dash" in out:
+        out["dash"] = tuple(config.px(v) for v in out["dash"])
+    if "spacing" in out:
+        out["spacing"] = config.px(out["spacing"])
+    if "far" in out:
+        out["far"] = _scale_style(out["far"])
+    return out
+
+
+if config.HD:
+    STYLES = {scheme: [(name, _scale_style(st)) for name, st in layers] for scheme, layers in STYLES.items()}
 
 # The visible area in NM is a little wider than RANGE horizontally (the
 # 720px frame is wider than the 340px-radius ring) and narrower vertically;
