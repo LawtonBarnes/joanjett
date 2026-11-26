@@ -108,18 +108,20 @@ def draw_ring_labels(surface, range_multiplier, radar_color, font):
         surface.blit(box, (label_pt[0] - box.get_width() / 2, label_pt[1] - box.get_height() / 2))
 
 
-def build_sweep_layer(angle_deg, radar_color, size):
+def build_sweep_layer(angle_deg, radar_color, size, dirty=None):
     """-> a fresh SRCALPHA surface with the trail+head, composited onto the
     background layer by the caller. Rebuilt every frame (this is the only
-    per-frame drawing work -- everything else is a static blit)."""
+    per-frame drawing work -- everything else is a static blit).
+    `dirty`, if given, collects the rects drawn into."""
+    dirty = [] if dirty is None else dirty
     layer = pygame.Surface(size, pygame.SRCALPHA)
     r, g, b = radar_color
     offset = 0.0
     while offset <= TRAIL_SWEEP_DEG:
         alpha = int(255 * (1 - offset / TRAIL_SWEEP_DEG))
         end_pt = _polar_to_px(config.OUTER_RADIUS_PX, angle_deg - offset)
-        pygame.draw.line(layer, (r, g, b, alpha), config.CENTER_PX, end_pt, TRAIL_LINE_WIDTH)
+        dirty.append(pygame.draw.line(layer, (r, g, b, alpha), config.CENTER_PX, end_pt, TRAIL_LINE_WIDTH))
         offset += TRAIL_ANGLE_STEP_DEG
     head_pt = _polar_to_px(config.OUTER_RADIUS_PX, angle_deg)
-    pygame.draw.line(layer, (r, g, b, 255), config.CENTER_PX, head_pt, SWEEP_HEAD_WIDTH)
+    dirty.append(pygame.draw.line(layer, (r, g, b, 255), config.CENTER_PX, head_pt, SWEEP_HEAD_WIDTH))
     return layer

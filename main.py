@@ -289,6 +289,38 @@ def draw_splash_status(fb, splash_base, status_y, font, status_text):
     fb.write_surface(canvas)
 
 
+def blit_used(canvas, layer, dirty):
+    """Blits only the part of a full-frame alpha layer that was drawn into
+    (`dirty`: the rects its draw calls returned) -- a full 1920x1080 alpha
+    blit is ~7 ms on HIDEF's Pi 5."""
+    if dirty:
+        rect = dirty[0].unionall(dirty[1:]).clip(layer.get_rect())
+        if rect.w and rect.h:
+            canvas.blit(layer, rect, rect)
+
+
+def vignette_strips(vignette):
+    """-> rects covering the vignette minus its fully clear middle, so the
+    per-frame blit skips the part that changes nothing."""
+    w, h = vignette.get_size()
+    alpha = pygame.surfarray.array_alpha(vignette)
+    x0, x1, y0, y1 = 0, w, 0, h
+    cols = np.flatnonzero(alpha[:, h // 2] == 0)
+    rows = np.flatnonzero(alpha[w // 2, :] == 0)
+    if len(cols) and len(rows):
+        x0, x1, y0, y1 = cols[0], cols[-1] + 1, rows[0], rows[-1] + 1
+        while x1 - x0 > 2 and y1 - y0 > 2 and alpha[x0:x1, y0:y1].any():
+            dx, dy = max(1, (x1 - x0) // 50), max(1, (y1 - y0) // 50)
+            x0, x1, y0, y1 = x0 + dx, x1 - dx, y0 + dy, y1 - dy
+    if alpha[x0:x1, y0:y1].any() or x1 <= x0 or y1 <= y0:
+        return [pygame.Rect(0, 0, w, h)]
+    x0, x1, y0, y1 = int(x0), int(x1), int(y0), int(y1)
+    return [r for r in (
+        pygame.Rect(0, 0, w, y0), pygame.Rect(0, y1, w, h - y1),
+        pygame.Rect(0, y0, x0, y1 - y0), pygame.Rect(x1, y0, w - x1, y1 - y0),
+    ) if r.w and r.h]
+
+
 class JoanJettApp:
     def __init__(self):
         self._quit_requested = False
@@ -344,11 +376,11 @@ class JoanJettApp:
         self.vignette_surface = pygame.image.load(str(VIGNETTE_PATH)).convert_alpha()
         if self.vignette_surface.get_size() != (FRAME_W, FRAME_H):
             self.vignette_surface = pygame.transform.smoothscale(self.vignette_surface, (FRAME_W, FRAME_H))
+        self.vignette_strips = vignette_strips(self.vignette_surface)
 
         self.map_surface = pygame.Surface((FRAME_W, FRAME_H))
         self.map_surface.fill(BLACK)
         self.background_surface = self.map_surface  # map + compass
-        self.rings_surface = pygame.Surface((FRAME_W, FRAME_H), pygame.SRCALPHA)  # its own layer, see rebuild_map
         self._radar_color = colors.rgb(colors.COLOR_SCHEMES[self.settings.color_scheme]["RADAR"])
         self._plane_color = colors.rgb(colors.COLOR_SCHEMES[self.settings.color_scheme]["PLANES"])
         self.error_message = None
@@ -450,8 +482,6 @@ class JoanJettApp:
         self.background_surface = self.map_surface.copy()
         compass.draw_compass(self.background_surface, map_color, self.compass_font)
         radar.draw_ring_labels(self.background_surface, self.range_multiplier, radar_color, self.ring_label_font)
-        self.rings_surface = pygame.Surface((FRAME_W, FRAME_H), pygame.SRCALPHA)
-        radar.draw_ring_lines(self.rings_surface, radar_color)
         self._radar_color = radar_color
         self._plane_color = colors.rgb(colors.COLOR_SCHEMES[s.color_scheme]["PLANES"])
         return True
@@ -495,26 +525,34 @@ class JoanJettApp:
         planes_layer = planes.render_planes(
             self.tracked_planes, self.settings.location_lat, self.settings.location_lon,
             range_nm, self._plane_color, self.callsign_font, (FRAME_W, FRAME_H),
-            ride_hex=self.airmetal.riding_hex,
+            ride_hex=self.airmetal.riding_hex, dirty=(planes_dirty := []),
         )
-        canvas.blit(planes_layer, (0, 0))
+        blit_used(canvas, planes_layer, planes_dirty)
 
-        canvas.blit(self.rings_surface, (0, 0))
-        sweep_layer = radar.build_sweep_layer(angle, self._radar_color, (FRAME_W, FRAME_H))
-        canvas.blit(sweep_layer, (0, 0))
+        # Rings are opaque, so drawing them straight on the canvas each
+        # frame looks the same as the old full-frame ring layer, and skips
+        # a full-frame alpha blit (2026-11-25, for HD's 1920x1080 frames).
+        radar.draw_ring_lines(canvas, self._radar_color)
+        sweep_dirty = []
+        sweep_layer = radar.build_sweep_layer(angle, self._radar_color, (FRAME_W, FRAME_H), sweep_dirty)
+        blit_used(canvas, sweep_layer, sweep_dirty)
 
-        canvas.blit(self.vignette_surface, (0, 0))
+        self.blit_vignette(canvas)
 
         # Info HUD sits on top of everything, including the vignette --
         # per spec it's the topmost layer, and text needs to stay fully
         # legible everywhere regardless of how the layers below it are
         # ordered/darkened.
-        info_layer = info.render_info(
+        info.render_info(
             (FRAME_W, FRAME_H), self.settings, self.range_multiplier, angle,
             self._latest_aircraft, self._aircraft_fetch_ok, self.settings.color_scheme, self.info_font,
+            target=canvas,
         )
-        canvas.blit(info_layer, (0, 0))
         return canvas
+
+    def blit_vignette(self, canvas):
+        for rect in self.vignette_strips:
+            canvas.blit(self.vignette_surface, rect, rect)
 
     def _render_aircraft_screen(self, angle):
         # Plain map, no compass/rings/sweep/planes -- per user request
@@ -524,7 +562,7 @@ class JoanJettApp:
         # of which screen is showing (angle is still computed/passed in),
         # so switching back to Radar shows continuity.
         canvas = self.map_surface.copy()
-        canvas.blit(self.vignette_surface, (0, 0))
+        self.blit_vignette(canvas)
         table_layer = aircraft_screen.render_aircraft_screen(
             (FRAME_W, FRAME_H), self._latest_aircraft, self._aircraft_fetch_ok, self.settings,
             self.range_multiplier, angle, self.settings.color_scheme, self.aircraft_screen_font,
@@ -536,7 +574,7 @@ class JoanJettApp:
         # Same plain-map/no-radar-layers treatment as the Aircraft screen
         # above.
         canvas = self.map_surface.copy()
-        canvas.blit(self.vignette_surface, (0, 0))
+        self.blit_vignette(canvas)
         category_layer = category_screen.render_category_screen(
             (FRAME_W, FRAME_H), self.settings.color_scheme, self.aircraft_screen_font,
         )
@@ -546,7 +584,7 @@ class JoanJettApp:
     def _render_airline_screen(self, screen_name):
         # Same plain-map/no-radar-layers treatment as Aircraft/Stats above.
         canvas = self.map_surface.copy()
-        canvas.blit(self.vignette_surface, (0, 0))
+        self.blit_vignette(canvas)
         mode = "international" if screen_name == "airline_intl" else "domestic"
         airline_layer = airline_screen.render_airline_screen(
             (FRAME_W, FRAME_H), mode, self.settings.color_scheme, self.aircraft_screen_font,
@@ -557,7 +595,7 @@ class JoanJettApp:
     def _render_military_screen(self):
         # Same plain-map/no-radar-layers treatment as Category/Airline above.
         canvas = self.map_surface.copy()
-        canvas.blit(self.vignette_surface, (0, 0))
+        self.blit_vignette(canvas)
         military_layer = military_screen.render_military_screen(
             (FRAME_W, FRAME_H), self.settings.color_scheme, self.aircraft_screen_font,
         )

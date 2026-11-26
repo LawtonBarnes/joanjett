@@ -92,8 +92,10 @@ def _draw_panel(surface, font, items, x, top_y, label_color, info_color, align):
                 y += _draw_boxed_segments(surface, font, [(line, label_color)], (x, y), align=align)
 
 
-def render_info(size, settings, range_multiplier, sweep_angle_deg, live_aircraft, fetch_ok, scheme, font):
-    layer = pygame.Surface(size, pygame.SRCALPHA)
+def render_info(size, settings, range_multiplier, sweep_angle_deg, live_aircraft, fetch_ok, scheme, font, target=None):
+    """Draws onto `target` if given (the frame itself -- saves a full-frame
+    alpha blit), else onto a new transparent layer it returns."""
+    layer = target if target is not None else pygame.Surface(size, pygame.SRCALPHA)
     label_color = colors.rgb(colors.COLOR_SCHEMES[scheme]["LABEL"])
     info_color = colors.rgb(colors.COLOR_SCHEMES[scheme]["INFO"])
     w, h = size

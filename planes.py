@@ -97,7 +97,7 @@ def update_tracked(tracked, live_aircraft, swept_from, swept_to, trail_length):
         plane.maybe_update(live_ac, swept_from, swept_to)
 
 
-def _draw_faded_trail(layer, px_points, color, width):
+def _draw_faded_trail(layer, px_points, color, width, dirty):
     """Each segment gets its own alpha: the segments nearest the current
     position (end of the list) stay fully opaque for
     TRAIL_FULL_OPACITY_SEGMENTS, then fade linearly to transparent by the
@@ -114,10 +114,12 @@ def _draw_faded_trail(layer, px_points, color, width):
             fade_span = max(1, n_segments - TRAIL_FULL_OPACITY_SEGMENTS)
             t = (segments_from_recent - TRAIL_FULL_OPACITY_SEGMENTS + 1) / fade_span
             alpha = max(0, int(255 * (1 - t)))
-        pygame.draw.line(layer, (r, g, b, alpha), px_points[j], px_points[j + 1], width)
+        dirty.append(pygame.draw.line(layer, (r, g, b, alpha), px_points[j], px_points[j + 1], width))
 
 
-def render_planes(tracked, center_lat, center_lon, range_nm, plane_color, font, size, ride_hex=None):
+def render_planes(tracked, center_lat, center_lon, range_nm, plane_color, font, size, ride_hex=None, dirty=None):
+    """`dirty`, if given, collects the rects drawn into."""
+    dirty = [] if dirty is None else dirty
     layer = pygame.Surface(size, pygame.SRCALPHA)
 
     plane_data = []
@@ -146,19 +148,19 @@ def render_planes(tracked, center_lat, center_lon, range_nm, plane_color, font, 
             box.fill(colors.rgb(colors.BLACK))
             box.blit(text, (CALLSIGN_BOX_PAD_X, CALLSIGN_BOX_PAD_Y))
             box_dx = RIDE_RING_RADIUS + RIDE_LABEL_GAP if hex_id == ride_hex else ARROWHEAD_WIDTH
-            layer.blit(box, (pos[0] + box_dx, pos[1] - box.get_height() / 2))
+            dirty.append(layer.blit(box, (pos[0] + box_dx, pos[1] - box.get_height() / 2)))
 
     ride_color = colors.rgb(colors.YELLOW)
     for hex_id, plane, px_points in plane_data:
         trail_color = helicopter_color if plane.is_helicopter else plane_color
-        _draw_faded_trail(layer, px_points, trail_color, TRAIL_WIDTH)
+        _draw_faded_trail(layer, px_points, trail_color, TRAIL_WIDTH, dirty)
 
         pos = px_points[-1]
         if hex_id == ride_hex:
             ring_h = RIDE_RING_RADIUS * config.PIXEL_ASPECT_RATIO
             ring = pygame.Rect(0, 0, RIDE_RING_RADIUS * 2, round(ring_h * 2))
             ring.center = (round(pos[0]), round(pos[1]))
-            pygame.draw.ellipse(layer, ride_color, ring, RIDE_RING_WIDTH)
+            dirty.append(pygame.draw.ellipse(layer, ride_color, ring, RIDE_RING_WIDTH))
         dx, dy = _heading_unit_vector(plane.heading_deg)
         tip = (pos[0] + dx * ARROWHEAD_LENGTH / 2, pos[1] + dy * ARROWHEAD_LENGTH / 2)
         base_center = (pos[0] - dx * ARROWHEAD_LENGTH / 2, pos[1] - dy * ARROWHEAD_LENGTH / 2)
@@ -166,6 +168,6 @@ def render_planes(tracked, center_lat, center_lon, range_nm, plane_color, font, 
         base_l = (base_center[0] + perp[0] * ARROWHEAD_WIDTH / 2, base_center[1] + perp[1] * ARROWHEAD_WIDTH / 2)
         base_r = (base_center[0] - perp[0] * ARROWHEAD_WIDTH / 2, base_center[1] - perp[1] * ARROWHEAD_WIDTH / 2)
         arrow_color = helicopter_color if plane.is_helicopter else plane_color
-        pygame.draw.polygon(layer, arrow_color, [tip, base_l, base_r])
+        dirty.append(pygame.draw.polygon(layer, arrow_color, [tip, base_l, base_r]))
 
     return layer
