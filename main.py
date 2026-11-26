@@ -299,6 +299,34 @@ def blit_used(canvas, layer, dirty):
             canvas.blit(layer, rect, rect)
 
 
+def fit_vignette(img):
+    """vignette.png (720x480, shaped for a 4:3 picture) at the frame size.
+    SD: scaled to fill. HD (2026-11-25): kept 4:3 -- scaled to the frame
+    height and centered -- and the side areas fade from its edge darkness
+    to solid black at the frame edge, so the outer ring sits in the dark
+    the way it does on composite instead of the vignette stretching 16:9."""
+    if not config.HD or FRAME_W * 3 <= FRAME_H * 4:
+        if img.get_size() != (FRAME_W, FRAME_H):
+            img = pygame.transform.smoothscale(img, (FRAME_W, FRAME_H))
+        return img
+    pic_w = round(FRAME_H * 4 / 3)
+    x0 = (FRAME_W - pic_w) // 2
+    pic = pygame.transform.smoothscale(img, (pic_w, FRAME_H))
+    pic_a = pygame.surfarray.array_alpha(pic).astype(np.float32)  # (w, h)
+    out = pygame.Surface((FRAME_W, FRAME_H), pygame.SRCALPHA)
+    out.fill((0, 0, 0, 255))
+    alpha = np.full((FRAME_W, FRAME_H), 255.0, dtype=np.float32)
+    alpha[x0:x0 + pic_w] = pic_a
+    bar_w = x0
+    if bar_w > 0:
+        t = (np.arange(1, bar_w + 1, dtype=np.float32) / bar_w)[:, None]  # 0 at the picture edge -> 1 at the frame edge
+        left_edge, right_edge = pic_a[0][None, :], pic_a[-1][None, :]
+        alpha[x0 - bar_w:x0] = (left_edge + (255 - left_edge) * t)[::-1]
+        alpha[x0 + pic_w:x0 + pic_w + bar_w] = right_edge + (255 - right_edge) * t
+    pygame.surfarray.pixels_alpha(out)[:] = np.clip(alpha, 0, 255).astype(np.uint8)
+    return out
+
+
 def vignette_strips(vignette):
     """-> rects covering the vignette minus its fully clear middle, so the
     per-frame blit skips the part that changes nothing."""
@@ -373,9 +401,7 @@ class JoanJettApp:
         # alpha and the underlying RGB is black at every pixel including
         # center). convert_alpha() + a normal blit is the correct way to
         # composite this asset.
-        self.vignette_surface = pygame.image.load(str(VIGNETTE_PATH)).convert_alpha()
-        if self.vignette_surface.get_size() != (FRAME_W, FRAME_H):
-            self.vignette_surface = pygame.transform.smoothscale(self.vignette_surface, (FRAME_W, FRAME_H))
+        self.vignette_surface = fit_vignette(pygame.image.load(str(VIGNETTE_PATH)).convert_alpha())
         self.vignette_strips = vignette_strips(self.vignette_surface)
 
         self.map_surface = pygame.Surface((FRAME_W, FRAME_H))
