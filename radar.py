@@ -94,8 +94,11 @@ def draw_ring_lines(surface, radar_color):
 
 
 def draw_ring_labels(surface, range_multiplier, radar_color, font):
-    """Draws just the NM digit labels (3/6/9/12) -- see draw_ring_lines."""
-    for k in range(1, 5):
+    """Draws just the NM digit labels (3/6/9/12) -- see draw_ring_lines.
+    HD leaves off the outer ring's label (2026-11-25): on 16:9 it lands
+    in plain view under the right panel's numbers (on SD the vignette and
+    the panel hid it)."""
+    for k in range(1, 4 if config.HD else 5):
         radius = config.OUTER_RADIUS_PX * k / 4
         label = str(int(round(range_multiplier * k)))
         text = font.render(label, True, radar_color)
