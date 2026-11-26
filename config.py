@@ -133,3 +133,13 @@ class Settings:
         # service on the receiver, so passes are logged whatever's on screen;
         # the app then never logs).
         self.logged_by = cp.get("flightlog", "logged_by", fallback="app").strip().lower()
+
+# Overlay text (the yellow/white/orange HUD and table screens) is exactly
+# 2x SD in HD -- a touch smaller than UI_SCALE, for breathing room in the
+# corners, where HIDEF's Samsung SlimFit gets soft (user, 2026-11-25).
+OVERLAY_TEXT_SCALE = 2
+
+
+def text_px(n):
+    """An SD size in the HUD/table text overlay at this display's scale."""
+    return n if not HD else n * OVERLAY_TEXT_SCALE

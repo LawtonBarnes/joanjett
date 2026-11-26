@@ -25,10 +25,10 @@ import colors
 import config
 import flightlog
 
-FONT_SIZE = config.px(22)  # matches aircraft_screen.py -- reuses main.py's aircraft_screen_font
-LINE_HEIGHT = config.px(22)  # matches airline_screen.py -- used only for the title/header skip
-BOX_PAD_X = config.px(4)
-BOX_PAD_Y = config.px(2)  # matches aircraft_screen.py/airline_screen.py -- MAX_ROWS=12 leaves
+FONT_SIZE = config.text_px(22)  # matches aircraft_screen.py -- reuses main.py's aircraft_screen_font
+LINE_HEIGHT = config.text_px(22)  # matches airline_screen.py -- used only for the title/header skip
+BOX_PAD_X = config.text_px(4)
+BOX_PAD_Y = config.text_px(2)  # matches aircraft_screen.py/airline_screen.py -- MAX_ROWS=12 leaves
 # enough vertical room now that 0-count rows are skipped, no need for the
 # tighter pad=1 the original all-16-rows version needed.
 BOX_ALPHA = 64  # 25% opacity, matching every other boxed-text screen

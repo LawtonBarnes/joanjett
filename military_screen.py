@@ -22,10 +22,10 @@ import colors
 import config
 import flightlog
 
-FONT_SIZE = config.px(22)  # matches aircraft_screen.py -- reuses main.py's aircraft_screen_font
-LINE_HEIGHT = config.px(22)  # matches category_screen.py's tight rhythm
-BOX_PAD_X = config.px(4)
-BOX_PAD_Y = config.px(2)
+FONT_SIZE = config.text_px(22)  # matches aircraft_screen.py -- reuses main.py's aircraft_screen_font
+LINE_HEIGHT = config.text_px(22)  # matches category_screen.py's tight rhythm
+BOX_PAD_X = config.text_px(4)
+BOX_PAD_Y = config.text_px(2)
 BOX_ALPHA = 64  # 25% opacity, matching every other boxed-text screen
 UNDERSCAN_FRACTION = 0.08  # matches aircraft_screen.py
 

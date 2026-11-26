@@ -13,11 +13,11 @@ import aircraft
 import colors
 import config
 
-FONT_SIZE = config.px(22)
-LINE_HEIGHT = config.px(22)  # tighter than info.py's 24 -- a 10-row table + footer
+FONT_SIZE = config.text_px(22)
+LINE_HEIGHT = config.text_px(22)  # tighter than info.py's 24 -- a 10-row table + footer
 # needs to fit in the vertical budget the 8% underscan leaves
-BOX_PAD_X = config.px(4)
-BOX_PAD_Y = config.px(2)
+BOX_PAD_X = config.text_px(4)
+BOX_PAD_Y = config.text_px(2)
 BOX_ALPHA = 64  # 25% opacity, matching the Info HUD's boxes
 UNDERSCAN_FRACTION = 0.08  # matches info.py
 
