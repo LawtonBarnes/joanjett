@@ -12,6 +12,14 @@ framebuffer architecture with [BARS](https://github.com/LawtonBarnes/bars)
 -- headless pygame, direct `/dev/fb0` writes, raw `evdev` keyboard
 input, exactly the same pattern used across every sibling app.
 
+**HD (2.0):** on a 16:9 HDMI screen (e.g. a Pi 5 at 1920x1080) the same
+app draws an HD layout natively: same bullseye relative to the picture
+height, square pixels, HUD/table text at 2x SD, side panels out toward
+the 16:9 edges, the vignette kept 4:3 with the sides fading to black,
+and no outer-ring NM label. `[display] display = auto|sd|hd` in
+`settings.ini` (auto = HD on a 16:9 framebuffer); `sd` on a 16:9 screen
+is pillarboxed 4:3, never stretched.
+
 ![Framebuffer capture -- radar screen](./img/SCREEN_JOANJETT.png)
 
 ## Why this exists as a rewrite
